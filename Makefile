@@ -24,7 +24,7 @@ MISC_PATH   = $(PREFIX)/share/afl
 
 # PROGS intentionally omit afl-as, which gets installed elsewhere.
 
-PROGS       = afl-gcc afl-fuzz afl-showmap afl-tmin afl-gotcpu afl-analyze
+PROGS       = afl-gcc afl-fuzz afl-fuzz-origin afl-fuzz-refactor afl-showmap afl-tmin afl-gotcpu afl-analyze
 SH_PROGS    = afl-plot afl-cmin afl-whatsup
 
 CFLAGS     ?= -O3 -funroll-loops
@@ -69,8 +69,11 @@ afl-as: afl-as.c afl-as.h $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
 	ln -sf afl-as as
 
-afl-fuzz: afl-fuzz.c $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
+afl-fuzz-origin: afl-fuzz.c $(COMM_HDR) | test_x86
+	$(CC) $(CFLAGS) afl-fuzz.c -o $@ $(LDFLAGS)
+
+afl-fuzz-refactor: $(COMM_HDR) | test_x86
+	$(CC) $(CFLAGS) src/core/globals.c src/core/queue.c src/core/executor.c src/core/forkserver.c src/utils/timing.c src/utils/random.c src/utils/memory.c src/utils/system.c src/analysis/bitmap.c src/analysis/coverage.c src/io/file_ops.c src/io/stats.c src/main/main.c -o $@ $(LDFLAGS)
 
 afl-showmap: afl-showmap.c $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
