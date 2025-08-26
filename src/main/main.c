@@ -17,49 +17,53 @@
 #include "../sync/sync.h"
 #include "../mutation/mutations.h"
 
-/* 显示使用提示 */
-void usage(u8* argv0) {
-  SAYF("\n🔧 AFL-FUZZ (模块化重构版本) 🔧\n");
-  SAYF("=====================================\n");
-  SAYF("%s [ options ] -- /path/to/fuzzed_app [ ... ]\n\n"
 
-       "必需参数:\n\n"
+/* Display usage hints. */
 
-       "  -i dir        - 包含测试用例的输入目录\n"
-       "  -o dir        - 模糊测试发现的输出目录\n\n"
+static void usage(u8* argv0) {
 
-       "执行控制设置:\n\n"
+  SAYF("\n%s [ options ] -- /path/to/fuzzed_app [ ... ]\n\n"
 
-       "  -f file       - 被模糊程序读取的位置 (stdin)\n"
-       "  -t msec       - 每次运行的超时 (自动缩放, 50-%u ms)\n"
-       "  -m megs       - 子进程内存限制 (%u MB)\n"
-       "  -Q            - 使用二进制插桩 (QEMU模式)\n\n"     
+       "Required parameters:\n\n"
+
+       "  -i dir        - input directory with test cases\n"
+       "  -o dir        - output directory for fuzzer findings\n\n"
+
+       "Execution control settings:\n\n"
+
+       "  -f file       - location read by the fuzzed program (stdin)\n"
+       "  -t msec       - timeout for each run (auto-scaled, 50-%u ms)\n"
+       "  -m megs       - memory limit for child process (%u MB)\n"
+       "  -Q            - use binary-only instrumentation (QEMU mode)\n\n"     
  
-       "模糊行为设置:\n\n"
+       "Fuzzing behavior settings:\n\n"
 
-       "  -d            - 快速模式 (跳过确定性步骤)\n"
-       "  -n            - 无插桩模糊 (笨拙模式)\n"
-       "  -x dir        - 可选的模糊字典 (见README)\n\n"
+       "  -d            - quick & dirty mode (skips deterministic steps)\n"
+       "  -n            - fuzz without instrumentation (dumb mode)\n"
+       "  -x dir        - optional fuzzer dictionary (see README)\n\n"
 
-       "其他:\n\n"
+       "Other stuff:\n\n"
 
-       "  -T text       - 在屏幕上显示的文本横幅\n"
-       "  -M / -S id    - 分布式模式 (见parallel_fuzzing.txt)\n"
-       "  -C            - 崩溃探索模式 (peruvian rabbit thing)\n"
-       "  -V            - 显示版本号并退出\n\n"
-       "  -b cpu_id     - 将模糊进程绑定到指定的CPU核心\n\n"
+       "  -T text       - text banner to show on the screen\n"
+       "  -M / -S id    - distributed mode (see parallel_fuzzing.txt)\n"
+       "  -C            - crash exploration mode (the peruvian rabbit thing)\n"
+       "  -V            - show version number and exit\n\n"
+       "  -b cpu_id     - bind the fuzzing process to the specified CPU core\n\n"
 
-       "📝 此版本使用模块化架构，代码已重构为多个专业模块\n"
-       "📂 架构: core/ utils/ analysis/ io/ main/\n"
-       "有关其他提示，请查阅 %s/README。\n\n",
+       "For additional tips, please consult %s/README.\n\n",
 
        argv0, EXEC_TIMEOUT, MEM_LIMIT, doc_path);
 
   exit(1);
+
 }
 
-/* 制作当前命令行的副本 */
-void save_cmdline(u32 argc, char** argv) {
+
+
+/* Make a copy of the current command line. */
+
+static void save_cmdline(u32 argc, char** argv) {
+
   u32 len = 1, i;
   u8* buf;
 
@@ -69,23 +73,36 @@ void save_cmdline(u32 argc, char** argv) {
   buf = orig_cmdline = ck_alloc(len);
 
   for (i = 0; i < argc; i++) {
+
     u32 l = strlen(argv[i]);
 
     memcpy(buf, argv[i], l);
     buf += l;
 
     if (i != argc - 1) *(buf++) = ' ';
+
   }
 
   *buf = 0;
+
 }
 
-/* 为QEMU重写argv */
-char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
+
+
+
+
+
+
+
+/* Rewrite argv for QEMU. */
+
+static char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
+
   char** new_argv = ck_alloc(sizeof(char*) * (argc + 4));
   u8 *tmp, *cp, *rsl, *own_copy;
 
-  /* QEMU稳定性故障的变通方法 */
+  /* Workaround for a QEMU stability glitch. */
+
   setenv("QEMU_LOG", "nochain", 1);
 
   memcpy(new_argv + 3, argv + 1, sizeof(char*) * argc);
@@ -93,10 +110,12 @@ char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
   new_argv[2] = target_path;
   new_argv[1] = "--";
 
-  /* 现在我们需要实际找到要放在argv[0]中的QEMU二进制文件 */
+  /* Now we need to actually find the QEMU binary to put in argv[0]. */
+
   tmp = getenv("AFL_PATH");
 
   if (tmp) {
+
     cp = alloc_printf("%s/afl-qemu-trace", tmp);
 
     if (access(cp, X_OK))
@@ -104,43 +123,60 @@ char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
 
     target_path = new_argv[0] = cp;
     return new_argv;
+
   }
 
   own_copy = ck_strdup(own_loc);
   rsl = strrchr(own_copy, '/');
 
   if (rsl) {
+
     *rsl = 0;
 
     cp = alloc_printf("%s/afl-qemu-trace", own_copy);
     ck_free(own_copy);
 
     if (!access(cp, X_OK)) {
+
       target_path = new_argv[0] = cp;
       return new_argv;
+
     }
 
   } else ck_free(own_copy);
 
   if (!access(BIN_PATH "/afl-qemu-trace", X_OK)) {
+
     target_path = new_argv[0] = ck_strdup(BIN_PATH "/afl-qemu-trace");
     return new_argv;
+
   }
 
   SAYF("\n" cLRD "[-] " cRST
-       "糟糕，找不到'afl-qemu-trace'二进制文件。该二进制文件必须按照qemu_mode/README.qemu中的说明单独构建。\n"
-       "    如果您已经安装了二进制文件，可能需要在环境中指定AFL_PATH。\n\n"
+       "Oops, unable to find the 'afl-qemu-trace' binary. The binary must be built\n"
+       "    separately by following the instructions in qemu_mode/README.qemu. If you\n"
+       "    already have the binary installed, you may need to specify AFL_PATH in the\n"
+       "    environment.\n\n"
 
-       "    当然，即使没有QEMU，afl-fuzz仍然可以与在编译时用afl-gcc插桩的二进制文件一起工作。\n"
-       "    还可以通过在命令行中指定'-n'将其用作传统的笨拙模糊器。\n");
+       "    Of course, even without QEMU, afl-fuzz can still work with binaries that are\n"
+       "    instrumented at compile time with afl-gcc. It is also possible to use it as a\n"
+       "    traditional \"dumb\" fuzzer by specifying '-n' in the command line.\n");
 
   FATAL("Failed to locate 'afl-qemu-trace'.");
+
 }
+
+
+
+
+
 
 #ifndef AFL_LIB
 
-/* 主入口点 */
+/* Main entry point */
+
 int main(int argc, char** argv) {
+
   s32 opt;
   u64 prev_queued = 0;
   u32 sync_interval_cnt = 0, seek_to;
@@ -159,7 +195,6 @@ int main(int argc, char** argv) {
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  /* 解析命令行参数 */
   while ((opt = getopt(argc, argv, "+i:o:f:m:b:t:T:dnCB:S:M:x:QV")) > 0)
 
     switch (opt) {
@@ -212,6 +247,12 @@ int main(int argc, char** argv) {
 
         if (out_file) FATAL("Multiple -f options not supported");
         out_file = optarg;
+        break;
+
+      case 'x': /* dictionary */
+
+        if (extras_dir) FATAL("Multiple -x options not supported");
+        extras_dir = optarg;
         break;
 
       case 't': { /* timeout */
@@ -287,6 +328,31 @@ int main(int argc, char** argv) {
         use_splicing = 1;
         break;
 
+      case 'B': /* load bitmap */
+
+        /* This is a secret undocumented option! It is useful if you find
+           an interesting test case during a normal fuzzing process, and want
+           to mutate it without rediscovering any of the test cases already
+           found during an earlier run.
+
+           To use this mode, you need to point -B to the fuzz_bitmap produced
+           by an earlier run for the exact same binary... and that's it.
+
+           I only used this once or twice to get variants of a particular
+           file, so I'm not making this an official setting. */
+
+        if (in_bitmap) FATAL("Multiple -B options not supported");
+
+        in_bitmap = optarg;
+        read_bitmap(in_bitmap);
+        break;
+
+      case 'C': /* crash mode */
+
+        if (crash_mode) FATAL("Multiple -C options not supported");
+        crash_mode = FAULT_CRASH;
+        break;
+
       case 'n': /* dumb mode */
 
         if (dumb_mode) FATAL("Multiple -n options not supported");
@@ -322,20 +388,21 @@ int main(int argc, char** argv) {
 
   if (optind == argc || !in_dir || !out_dir) usage(argv[0]);
 
-  save_cmdline(argc, argv);
+  setup_signal_handlers();
+  check_asan_opts();
 
-  /* 同步模式验证 */
   if (sync_id) fix_up_sync();
 
-  /* 检查目录 */
   if (!strcmp(in_dir, out_dir))
     FATAL("Input and output directories can't be the same");
 
   if (dumb_mode) {
-    if (qemu_mode) FATAL("-Q and -n are mutually exclusive");
+
+    if (crash_mode) FATAL("-C and -n are mutually exclusive");
+    if (qemu_mode)  FATAL("-Q and -n are mutually exclusive");
+
   }
 
-  /* 环境变量检查 */
   if (getenv("AFL_NO_FORKSRV"))    no_forkserver    = 1;
   if (getenv("AFL_NO_CPU_RED"))    no_cpu_meter_red = 1;
   if (getenv("AFL_NO_ARITH"))      no_arith         = 1;
@@ -347,49 +414,82 @@ int main(int argc, char** argv) {
     if (!hang_tmout) FATAL("Invalid value of AFL_HANG_TMOUT");
   }
 
-  /* 设置横幅 */
+  if (dumb_mode == 2 && no_forkserver)
+    FATAL("AFL_DUMB_FORKSRV and AFL_NO_FORKSRV are mutually exclusive");
+
+  if (getenv("AFL_PRELOAD")) {
+    setenv("LD_PRELOAD", getenv("AFL_PRELOAD"), 1);
+    setenv("DYLD_INSERT_LIBRARIES", getenv("AFL_PRELOAD"), 1);
+  }
+
+  if (getenv("AFL_LD_PRELOAD"))
+    FATAL("Use AFL_PRELOAD instead of AFL_LD_PRELOAD");
+
+  save_cmdline(argc, argv);
+
   fix_up_banner(argv[optind]);
 
-  /* 检查TTY */  
   check_if_tty();
 
-  /* 获取CPU核心数 */
   get_core_count();
 
 #ifdef HAVE_AFFINITY
   bind_to_free_cpu();
 #endif /* HAVE_AFFINITY */
 
-  /* 初始化核心组件 */
+  check_crash_handling();
+  check_cpu_governor();
+
+  setup_post();
+  setup_shm();
   init_count_class16();
-  
-  /* 读取测试用例 */
+
+  setup_dirs_fds();
   read_testcases();
-  
+  load_auto();
+
+  pivot_inputs();
+
+  if (extras_dir) load_extras(extras_dir);
+
+  if (!timeout_given) find_timeout();
+
+  detect_file_args(argv + optind + 1);
+
+  if (!out_file) setup_stdio_file();
+
+  check_binary(argv[optind]);
+
   start_time = get_cur_time();
-  
-  /* 基本的主循环逻辑 */
+
   if (qemu_mode)
     use_argv = get_qemu_argv(argv[0], argv + optind, argc - optind);
   else
     use_argv = argv + optind;
 
-  /* 查找开始位置（恢复模式） */
+  perform_dry_run(use_argv);
+
+  cull_queue();
+
+  show_init_stats();
+
   seek_to = find_start_position();
 
-  /* 写入初始统计文件 */
   write_stats_file(0, 0, 0);
-  
+  save_auto();
+
   if (stop_soon) goto stop_fuzzing;
 
-  SAYF("模块化AFL初始化完成。\n");
-  SAYF("输入目录: %s\n", in_dir);
-  SAYF("输出目录: %s\n", out_dir);
-  SAYF("总测试用例: %u\n", queued_paths);
-  
-  /* 简化的主模糊循环 */
+  /* Woop woop woop */
+
+  if (!not_on_tty) {
+    sleep(4);
+    start_time += 4000;
+    if (stop_soon) goto stop_fuzzing;
+  }
+
   while (1) {
-    
+
     u8 skipped_fuzz;
 
     cull_queue();
@@ -410,12 +510,17 @@ int main(int argc, char** argv) {
       show_stats();
 
       if (not_on_tty) {
-        ACTF("进入队列循环 %llu。", queue_cycle);
+        ACTF("Entering queue cycle %llu.", queue_cycle);
         fflush(stdout);
       }
 
+      /* If we had a full queue cycle with no new finds, try
+         recombination strategies next. */
+
       if (queued_paths == prev_queued) {
+
         if (use_splicing) cycles_wo_finds++; else use_splicing = 1;
+
       } else cycles_wo_finds = 0;
 
       prev_queued = queued_paths;
@@ -428,8 +533,10 @@ int main(int argc, char** argv) {
     skipped_fuzz = fuzz_one(use_argv);
 
     if (!stop_soon && sync_id && !skipped_fuzz) {
+      
       if (!(sync_interval_cnt++ % SYNC_INTERVAL))
         sync_fuzzers(use_argv);
+
     }
 
     if (!stop_soon && exit_1) stop_soon = 2;
@@ -438,26 +545,60 @@ int main(int argc, char** argv) {
 
     queue_cur = queue_cur->next;
     current_entry++;
+
   }
 
   if (queue_cur) show_stats();
 
-stop_fuzzing:
-
-  SAYF(CURSOR_SHOW cLRD "\n\n+++ 测试已终止 +++\n" cRST);
-
-  /* 运行超过30分钟但仍在做第一轮？ */
-  if (queue_cycle == 1 && get_cur_time() - start_time > 30 * 60 * 1000) {
-    SAYF("\n" cYEL "[!] " cRST
-           "在第一轮期间停止，结果可能不完整。\n"
-           "    （有关恢复的信息，请参阅 %s/README。）\n", doc_path);
+  /* If we stopped programmatically, we kill the forkserver and the current runner. 
+     If we stopped manually, this is done by the signal handler. */
+  if (stop_soon == 2) {
+      if (child_pid > 0) kill(child_pid, SIGKILL);
+      if (forksrv_pid > 0) kill(forksrv_pid, SIGKILL);
+  }
+  /* Now that we've killed the forkserver, we wait for it to be able to get rusage stats. */
+  if (waitpid(forksrv_pid, NULL, 0) <= 0) {
+    WARNF("error waitpid\n");
   }
 
+  write_bitmap();
+  write_stats_file(0, 0, 0);
+  save_auto();
+
+stop_fuzzing:
+
+  SAYF(CURSOR_SHOW cLRD "\n\n+++ Testing aborted %s +++\n" cRST,
+       stop_soon == 2 ? "programmatically" : "by user");
+
+  /* Running for more than 30 minutes but still doing first cycle? */
+
+  if (queue_cycle == 1 && get_cur_time() - start_time > 30 * 60 * 1000) {
+
+    SAYF("\n" cYEL "[!] " cRST
+           "Stopped during the first cycle, results may be incomplete.\n"
+           "    (For info on resuming, see %s/README.)\n", doc_path);
+
+  }
+
+  fclose(plot_file);
   destroy_queue();
-  
-  SAYF("完成！祝您愉快！\n");
+  destroy_extras();
+  ck_free(target_path);
+  ck_free(sync_id);
+
+  alloc_report();
+
+  OKF("We're done here. Have a nice day!\n");
 
   exit(0);
+
 }
 
 #endif /* !AFL_LIB */
+
+
+
+
+
+
+

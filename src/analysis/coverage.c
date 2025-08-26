@@ -10,17 +10,29 @@
 extern u8* trace_bits;
 extern u8* out_dir;
 
-/* 将位图数据写入文件 */
-void write_bitmap(void) {
-  
-  u8* fn = alloc_printf("%s/fuzz_bitmap", out_dir);
+
+
+/* Write bitmap to file. The bitmap is useful mostly for the secret
+   -B option, to focus a separate fuzzing session on a particular
+   interesting input without rediscovering all the others. */
+
+EXP_ST void write_bitmap(void) {
+
+  u8* fname;
   s32 fd;
 
-  fd = open(fn, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-  if (fd < 0) PFATAL("无法创建 '%s'", fn);
+  if (!bitmap_changed) return;
+  bitmap_changed = 0;
 
-  ck_write(fd, trace_bits, MAP_SIZE, fn);
+  fname = alloc_printf("%s/fuzz_bitmap", out_dir);
+  fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+
+  if (fd < 0) PFATAL("Unable to open '%s'", fname);
+
+  ck_write(fd, virgin_bits, MAP_SIZE, fname);
+
   close(fd);
-  ck_free(fn);
+  ck_free(fname);
 
 }
+

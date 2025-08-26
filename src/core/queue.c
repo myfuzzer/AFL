@@ -15,8 +15,11 @@ extern u64 cycles_wo_finds;
 extern u64 last_path_time;
 extern u8 *out_dir;
 
-/* 将新测试用例添加到队列 */
-void add_to_queue(u8* fname, u32 len, u8 passed_det) {
+
+/* Append new test case to the queue. */
+
+static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
+
   struct queue_entry* q = ck_alloc(sizeof(struct queue_entry));
 
   q->fname        = fname;
@@ -27,8 +30,10 @@ void add_to_queue(u8* fname, u32 len, u8 passed_det) {
   if (q->depth > max_depth) max_depth = q->depth;
 
   if (queue_top) {
+
     queue_top->next = q;
     queue_top = q;
+
   } else q_prev100 = queue = queue_top = q;
 
   queued_paths++;
@@ -36,31 +41,45 @@ void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
   cycles_wo_finds = 0;
 
-  /* 为每100个元素（索引0、100等）设置next_100指针以允许更快的迭代 */
+  /* Set next_100 pointer for every 100th element (index 0, 100, etc) to allow faster iteration. */
   if ((queued_paths - 1) % 100 == 0 && queued_paths > 1) {
+
     q_prev100->next_100 = q;
     q_prev100 = q;
+
   }
 
   last_path_time = get_cur_time();
+
 }
 
-/* 销毁整个队列 */
-void destroy_queue(void) {
+
+
+/* Destroy the entire queue. */
+
+EXP_ST void destroy_queue(void) {
+
   struct queue_entry *q = queue, *n;
 
   while (q) {
+
     n = q->next;
     ck_free(q->fname);
     ck_free(q->trace_mini);
     ck_free(q);
     q = n;
+
   }
+
 }
 
-/* 将确定性检查标记为对特定队列条目完成。我们使用.state文件
-   来避免在恢复中止的扫描时重复确定性模糊测试 */
-void mark_as_det_done(struct queue_entry* q) {
+
+/* Mark deterministic checks as done for a particular queue entry. We use the
+   .state file to avoid repeating deterministic fuzzing when resuming aborted
+   scans. */
+
+static void mark_as_det_done(struct queue_entry* q) {
+
   u8* fn = strrchr(q->fname, '/');
   s32 fd;
 
@@ -73,30 +92,44 @@ void mark_as_det_done(struct queue_entry* q) {
   ck_free(fn);
 
   q->passed_det = 1;
+
 }
 
-/* 标记为可变。如果可能，创建符号链接以便更容易检查文件 */
-void mark_as_variable(struct queue_entry* q) {
+
+/* Mark as variable. Create symlinks if possible to make it easier to examine
+   the files. */
+
+static void mark_as_variable(struct queue_entry* q) {
+
   u8 *fn = strrchr(q->fname, '/') + 1, *ldest;
 
   ldest = alloc_printf("../../%s", fn);
   fn = alloc_printf("%s/queue/.state/variable_behavior/%s", out_dir, fn);
 
   if (symlink(ldest, fn)) {
+
     s32 fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, 0600);
     if (fd < 0) PFATAL("Unable to create '%s'", fn);
     close(fd);
+
   }
 
   ck_free(ldest);
   ck_free(fn);
 
   q->var_behavior = 1;
+
 }
 
-/* 标记/取消标记为冗余（仅边缘）。这不用于恢复状态，
-   但对于后处理数据集可能有用 */
-void mark_as_redundant(struct queue_entry* q, u8 state) {
+
+
+
+
+/* Mark / unmark as redundant (edge-only). This is not used for restoring state,
+   but may be useful for post-processing datasets. */
+
+static void mark_as_redundant(struct queue_entry* q, u8 state) {
+
   u8* fn;
   s32 fd;
 
@@ -108,24 +141,38 @@ void mark_as_redundant(struct queue_entry* q, u8 state) {
   fn = alloc_printf("%s/queue/.state/redundant_edges/%s", out_dir, fn + 1);
 
   if (state) {
+
     fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, 0600);
     if (fd < 0) PFATAL("Unable to create '%s'", fn);
     close(fd);
+
   } else {
+
     if (unlink(fn)) PFATAL("Unable to remove '%s'", fn);
+
   }
 
   ck_free(fn);
+
 }
+
 
 extern struct queue_entry* top_rated[MAP_SIZE];
 extern u32 queued_favored, pending_favored, queued_variable;
 extern u8 score_changed, dumb_mode;
 
-/* 上述机制讨论的第二部分是一个例程，它遍历top_rated[]条目，
-   然后依次抓取先前未见字节的获胜者（temp_v）并将其标记为偏爱的，
-   至少在下一次运行之前。偏爱的条目在所有模糊测试步骤中获得更多的播放时间 */
-void cull_queue(void) {
+
+
+
+
+/* The second part of the mechanism discussed above is a routine that
+   goes over top_rated[] entries, and then sequentially grabs winners for
+   previously-unseen bytes (temp_v) and marks them as favored, at least
+   until the next run. The favored entries are given more air time during
+   all fuzzing steps. */
+
+static void cull_queue(void) {
+
   struct queue_entry* q;
   static u8 temp_v[MAP_SIZE >> 3];
   u32 i;
@@ -146,15 +193,15 @@ void cull_queue(void) {
     q = q->next;
   }
 
-  /* 让我们看看位图中是否有任何内容没有在temp_v中捕获。
-     如果是，并且它有top_rated[]竞争者，让我们使用它 */
+  /* Let's see if anything in the bitmap isn't captured in temp_v.
+     If yes, and if it has a top_rated[] contender, let's use it. */
 
   for (i = 0; i < MAP_SIZE; i++)
     if (top_rated[i] && (temp_v[i >> 3] & (1 << (i & 7)))) {
 
       u32 j = MAP_SIZE >> 3;
 
-      /* 从temp_v中删除属于当前条目的所有位 */
+      /* Remove all bits belonging to the current entry from temp_v. */
 
       while (j--) 
         if (top_rated[i]->trace_mini[j])
@@ -164,6 +211,7 @@ void cull_queue(void) {
       queued_favored++;
 
       if (!top_rated[i]->was_fuzzed) pending_favored++;
+
     }
 
   q = queue;
@@ -172,20 +220,36 @@ void cull_queue(void) {
     mark_as_redundant(q, !q->favored);
     q = q->next;
   }
+
 }
+
+
+
+
+
 
 extern u64 total_bitmap_size, total_bitmap_entries;
 extern u8* trace_bits;
 
-/* 当我们遇到新路径时，我们调用这个来查看路径是否比任何现有路径看起来更"有利"。
-   "收藏夹"的目的是拥有一组触发迄今为止在位图中看到的所有位的最小路径集，
-   并专注于模糊测试它们而不是其余的 */
-void update_bitmap_score(struct queue_entry* q) {
+
+
+/* When we bump into a new path, we call this to see if the path appears
+   more "favorable" than any of the existing ones. The purpose of the
+   "favorables" is to have a minimal set of paths that trigger all the bits
+   seen in the bitmap so far, and focus on fuzzing them at the expense of
+   the rest.
+
+   The first step of the process is to maintain a list of top_rated[] entries
+   for every byte in the bitmap. We win that slot if there is no previous
+   contender, or if the contender has a more favorable speed x size factor. */
+
+static void update_bitmap_score(struct queue_entry* q) {
+
   u32 i;
   u64 fav_factor = q->exec_us * q->len;
 
-  /* 对于trace_bits[]中设置的每个字节，看看是否有先前的获胜者，
-     以及它与我们的比较如何 */
+  /* For every byte set in trace_bits[], see if there is a previous winner,
+     and how it compares to us. */
 
   for (i = 0; i < MAP_SIZE; i++)
 
@@ -193,12 +257,12 @@ void update_bitmap_score(struct queue_entry* q) {
 
        if (top_rated[i]) {
 
-         /* 更快执行或更小的测试用例是首选的 */
+         /* Faster-executing or smaller test cases are favored. */
 
          if (fav_factor > top_rated[i]->exec_us * top_rated[i]->len) continue;
 
-         /* 看起来我们要赢了。减少先前获胜者的引用计数，
-            如果必要，丢弃其trace_bits[] */
+         /* Looks like we're going to win. Decrease ref count for the
+            previous winner, discard its trace_bits[] if necessary. */
 
          if (!--top_rated[i]->tc_ref) {
            ck_free(top_rated[i]->trace_mini);
@@ -207,7 +271,7 @@ void update_bitmap_score(struct queue_entry* q) {
 
        }
 
-       /* 将我们自己作为新的获胜者插入 */
+       /* Insert ourselves as the new winner. */
 
        top_rated[i] = q;
        q->tc_ref++;
@@ -220,4 +284,6 @@ void update_bitmap_score(struct queue_entry* q) {
        score_changed = 1;
 
      }
+
 }
+

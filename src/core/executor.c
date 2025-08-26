@@ -38,27 +38,40 @@ extern u8* stage_name;
 extern s32 stage_cur, stage_max;
 extern u32 stats_update_freq;
 
-/* 执行目标应用程序，监控超时。成功返回0，超时返回1，
-   崩溃返回2。核心函数 - 执行实际模糊测试运行 */
-u8 run_target(char** argv, u32 timeout) {
+
+
+
+/* Execute target application, monitoring for timeouts. Return status
+   information. The called program will update trace_bits[]. */
+
+static u8 run_target(char** argv, u32 timeout) {
+
   static struct itimerval it;
   static u32 prev_timed_out = 0;
   static u64 exec_ms = 0;
 
   int status = 0;
   u32 tb4;
-  s32 res;
 
   child_timed_out = 0;
 
-  /* 在无分支服务器模式下，我们每次调用execve()。这是一个相当慢的操作，
-     但可以让我们处理各种非标准目标 */
+  /* After this memset, trace_bits[] are effectively volatile, so we
+     must prevent any earlier operations from venturing into that
+     territory. */
+
+  memset(trace_bits, 0, MAP_SIZE);
+  MEM_BARRIER();
+
+  /* If we're running in "dumb" mode, we can't rely on the fork server
+     logic compiled into the target program, so we will just keep calling
+     execve(). There is a bit of code duplication between here and 
+     init_forkserver(), but c'est la vie. */
 
   if (dumb_mode == 1 || no_forkserver) {
 
     child_pid = fork();
 
-    if (child_pid < 0) PFATAL("fork() 失败");
+    if (child_pid < 0) PFATAL("fork() failed");
 
     if (!child_pid) {
 
@@ -69,18 +82,23 @@ u8 run_target(char** argv, u32 timeout) {
         r.rlim_max = r.rlim_cur = ((rlim_t)mem_limit) << 20;
 
 #ifdef RLIMIT_AS
-        setrlimit(RLIMIT_AS, &r); /* 忽略错误 */
+
+        setrlimit(RLIMIT_AS, &r); /* Ignore errors */
+
 #else
-        setrlimit(RLIMIT_DATA, &r); /* 忽略错误 */
+
+        setrlimit(RLIMIT_DATA, &r); /* Ignore errors */
+
 #endif /* ^RLIMIT_AS */
 
       }
 
-      /* 防止核心转储是慢的 */
       r.rlim_max = r.rlim_cur = 0;
-      setrlimit(RLIMIT_CORE, &r); /* 忽略错误 */
 
-      /* 隔离进程并配置标准描述符 */
+      setrlimit(RLIMIT_CORE, &r); /* Ignore errors */
+
+      /* Isolate the process and configure standard descriptors. If out_file is
+         specified, stdin is /dev/null; otherwise, out_fd is cloned instead. */
 
       setsid();
 
@@ -88,21 +106,39 @@ u8 run_target(char** argv, u32 timeout) {
       dup2(dev_null_fd, 2);
 
       if (out_file) {
+
         dup2(dev_null_fd, 0);
+
       } else {
+
         dup2(out_fd, 0);
         close(out_fd);
+
       }
 
-      /* 设置环境变量 */
-      if (getenv("AFL_PRELOAD")) {
-        setenv("LD_PRELOAD", getenv("AFL_PRELOAD"), 1);
-        setenv("DYLD_INSERT_LIBRARIES", getenv("AFL_PRELOAD"), 1);
-      }
+      /* On Linux, would be faster to use O_CLOEXEC. Maybe TODO. */
+
+      close(dev_null_fd);
+      close(out_dir_fd);
+      close(dev_urandom_fd);
+      close(fileno(plot_file));
+
+      /* Set sane defaults for ASAN if nothing else specified. */
+
+      setenv("ASAN_OPTIONS", "abort_on_error=1:"
+                             "detect_leaks=0:"
+                             "symbolize=0:"
+                             "allocator_may_return_null=1", 0);
+
+      setenv("MSAN_OPTIONS", "exit_code=" STRINGIFY(MSAN_ERROR) ":"
+                             "symbolize=0:"
+                             "msan_track_origins=0", 0);
 
       execv(target_path, argv);
 
-      /* 使用特定的退出代码 */
+      /* Use a distinctive bitmap value to tell the parent about execv()
+         falling through. */
+
       *(u32*)trace_bits = EXEC_FAIL_SIG;
       exit(0);
 
@@ -110,35 +146,52 @@ u8 run_target(char** argv, u32 timeout) {
 
   } else {
 
-    /* 在分叉服务器模式下，我们只需要告诉它创建一个新进程... */
+    s32 res;
 
-    if ((res = write(fsrv_ctl_fd, &prev_timed_out, 4)) != 4)
-      FATAL("无法请求新进程");
+    /* In non-dumb mode, we have the fork server up and running, so simply
+       tell it to have at it, and then read back PID. */
 
-    if ((res = read(fsrv_st_fd, &child_pid, 4)) != 4)
-      FATAL("无法请求新进程");
+    if ((res = write(fsrv_ctl_fd, &prev_timed_out, 4)) != 4) {
 
-    if (child_pid <= 0) FATAL("Fork server故障");
+      if (stop_soon) return 0;
+      RPFATAL(res, "Unable to request new process from fork server (OOM?)");
+
+    }
+
+    if ((res = read(fsrv_st_fd, &child_pid, 4)) != 4) {
+
+      if (stop_soon) return 0;
+      RPFATAL(res, "Unable to request new process from fork server (OOM?)");
+
+    }
+
+    if (child_pid <= 0) FATAL("Fork server is misbehaving (OOM?)");
 
   }
 
-  /* 设置超时。使用setitimer()而不是alarm()，因为前者对子进程是透明的 */
+  /* Configure timeout, as requested by user, then wait for child to terminate. */
 
   it.it_value.tv_sec = (timeout / 1000);
   it.it_value.tv_usec = (timeout % 1000) * 1000;
 
   setitimer(ITIMER_REAL, &it, NULL);
 
-  /* 等待子进程终止 */
+  /* The SIGALRM handler simply kills the child_pid and sets child_timed_out. */
 
   if (dumb_mode == 1 || no_forkserver) {
 
-    if (waitpid(child_pid, &status, 0) <= 0) PFATAL("waitpid() 失败");
+    if (waitpid(child_pid, &status, 0) <= 0) PFATAL("waitpid() failed");
 
   } else {
 
-    if ((res = read(fsrv_st_fd, &status, 4)) != 4)
-      FATAL("无法从分叉服务器接收()");
+    s32 res;
+
+    if ((res = read(fsrv_st_fd, &status, 4)) != 4) {
+
+      if (stop_soon) return 0;
+      RPFATAL(res, "Unable to communicate with fork server (OOM?)");
+
+    }
 
   }
 
@@ -146,7 +199,7 @@ u8 run_target(char** argv, u32 timeout) {
 
   getitimer(ITIMER_REAL, &it);
   exec_ms = (u64) timeout - (it.it_value.tv_sec * 1000 +
-                            it.it_value.tv_usec / 1000);
+                             it.it_value.tv_usec / 1000);
 
   it.it_value.tv_sec = 0;
   it.it_value.tv_usec = 0;
@@ -155,11 +208,23 @@ u8 run_target(char** argv, u32 timeout) {
 
   total_execs++;
 
-  /* 任何后续计时 */
+  /* Any subsequent operations on trace_bits must not be moved by the
+     compiler below this point. Past this location, trace_bits[] behave
+     very normally and do not have to be treated as volatile. */
 
-  if (slowest_exec_ms < exec_ms) slowest_exec_ms = exec_ms;
+  MEM_BARRIER();
 
-  /* 报告结果 */
+  tb4 = *(u32*)trace_bits;
+
+#ifdef WORD_SIZE_64
+  classify_counts((u64*)trace_bits);
+#else
+  classify_counts((u32*)trace_bits);
+#endif /* ^WORD_SIZE_64 */
+
+  prev_timed_out = child_timed_out;
+
+  /* Report outcome to caller. */
 
   if (WIFSIGNALED(status) && !stop_soon) {
 
@@ -171,38 +236,45 @@ u8 run_target(char** argv, u32 timeout) {
 
   }
 
-  /* 一个不太常见的例子：我们在子进程正在运行时捕获了^C；它必须是手动停止的 */
+  /* A somewhat nasty hack for MSAN, which doesn't support abort_on_error and
+     must use a special exit code. */
 
-  if (stop_soon && !child_timed_out) {
-    child_timed_out = 1;
-    if (child_pid > 0) kill(child_pid, SIGKILL);
+  if (uses_asan && WEXITSTATUS(status) == MSAN_ERROR) {
+    kill_signal = 0;
+    return FAULT_CRASH;
   }
 
-  if (child_timed_out) return FAULT_TMOUT;
+  if ((dumb_mode == 1 || no_forkserver) && tb4 == EXEC_FAIL_SIG)
+    return FAULT_ERROR;
 
-  /* 检查执行失败 */
-
-  tb4 = *(u32*)trace_bits;
-
-  if (!dumb_mode && tb4 == EXEC_FAIL_SIG) return FAULT_ERROR;
+  /* It makes sense to account for the slowest units only if the testcase was run
+  under the user defined timeout. */
+  if (!(timeout > exec_tmout) && (slowest_exec_ms < exec_ms)) {
+    slowest_exec_ms = exec_ms;
+  }
 
   return FAULT_NONE;
 
 }
 
-/* 将修改后的数据写入临时文件，然后被被测程序读取。如果out_file被设置，
-   那个临时文件被使用。否则，数据通过stdin传递 */
-void write_to_testcase(void* mem, u32 len) {
-  
+
+
+
+/* Write modified data to file for testing. If out_file is set, the old file
+   is unlinked and a new one is created. Otherwise, out_fd is rewound and
+   truncated. */
+
+static void write_to_testcase(void* mem, u32 len) {
+
   s32 fd = out_fd;
 
   if (out_file) {
-    
-    unlink(out_file); /* 忽略错误 */
+
+    unlink(out_file); /* Ignore errors. */
 
     fd = open(out_file, O_WRONLY | O_CREAT | O_EXCL, 0600);
 
-    if (fd < 0) PFATAL("无法创建'%s'", out_file);
+    if (fd < 0) PFATAL("Unable to create '%s'", out_file);
 
   } else lseek(fd, 0, SEEK_SET);
 
@@ -210,17 +282,22 @@ void write_to_testcase(void* mem, u32 len) {
 
   if (!out_file) {
 
-    if (ftruncate(fd, len)) PFATAL("ftruncate() 失败");
+    if (ftruncate(fd, len)) PFATAL("ftruncate() failed");
     lseek(fd, 0, SEEK_SET);
 
   } else close(fd);
 
 }
 
-/* 执行单一执行，处理故障恢复的超时等等。我们需要参数列表，内存块和长度作为参数。
-   这是core_fuzzing_loop调用的例程 */
-u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
-                 u32 handicap, u8 from_queue) {
+
+/* Calibrate a new test case. This is done when processing the input directory
+   to warn about flaky or otherwise problematic test cases early on; and when
+   new paths are discovered to detect variable behavior and so on. */
+
+static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
+                         u32 handicap, u8 from_queue) {
+
+  static u8 first_trace[MAP_SIZE];
 
   u8  fault = 0, new_bits = 0, var_detected = 0, hnb = 0,
       first_run = (q->exec_cksum == 0);
@@ -231,21 +308,34 @@ u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
   u32 use_tmout = exec_tmout;
   u8* old_sn = stage_name;
 
-  /* 务必定时这个最初的运行 */
+  /* Be a bit more generous about timeouts when resuming sessions, or when
+     trying to calibrate already-added finds. This helps avoid trouble due
+     to intermittent latency. */
 
-  stage_name = "校准";
-  stage_max  = fast_cal ? 3 : 8;
+  if (!from_queue || resuming_fuzz)
+    use_tmout = MAX(exec_tmout + CAL_TMOUT_ADD,
+                    exec_tmout * CAL_TMOUT_PERC / 100);
 
-  start_us = get_cur_time_us();
+  q->cal_failed++;
 
-  /* 确保分叉服务器正在运行，如果这是我们的第一个真正的测试案例 */
+  stage_name = "calibration";
+  stage_max  = fast_cal ? 3 : CAL_CYCLES;
+
+  /* Make sure the forkserver is up before we do anything, and let's not
+     count its spin-up time toward binary calibration. */
 
   if (dumb_mode != 1 && !no_forkserver && !forksrv_pid)
     init_forkserver(argv);
 
-  if (q->exec_speed) use_tmout = q->exec_speed;
+  if (q->exec_cksum) {
 
-  /* 运行真实的校准循环 */
+    memcpy(first_trace, trace_bits, MAP_SIZE);
+    hnb = has_new_bits(virgin_bits);
+    if (hnb > new_bits) new_bits = hnb;
+
+  }
+
+  start_us = get_cur_time_us();
 
   for (stage_cur = 0; stage_cur < stage_max; stage_cur++) {
 
@@ -257,18 +347,46 @@ u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
 
     fault = run_target(argv, use_tmout);
 
-    /* stop_soon被其他线程设置 */
+    /* stop_soon is set by the handler for Ctrl+C. When it's pressed,
+       we want to bail out quickly. */
+
     if (stop_soon || fault != crash_mode) goto abort_calibration;
 
-    if (!dumb_mode && (first_run || new_bits)) {
+    if (!dumb_mode && !stage_cur && !count_bytes(trace_bits)) {
+      fault = FAULT_NOINST;
+      goto abort_calibration;
+    }
 
-      cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
+    cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
 
-      if (first_run) q->exec_cksum = cksum;
-      else if (q->exec_cksum != cksum) var_detected = 1;
+    if (q->exec_cksum != cksum) {
 
       hnb = has_new_bits(virgin_bits);
       if (hnb > new_bits) new_bits = hnb;
+
+      if (q->exec_cksum) {
+
+        u32 i;
+
+        for (i = 0; i < MAP_SIZE; i++) {
+
+          if (!var_bytes[i] && first_trace[i] != trace_bits[i]) {
+
+            var_bytes[i] = 1;
+            stage_max    = CAL_CYCLES_LONG;
+
+          }
+
+        }
+
+        var_detected = 1;
+
+      } else {
+
+        q->exec_cksum = cksum;
+        memcpy(first_trace, trace_bits, MAP_SIZE);
+
+      }
 
     }
 
@@ -279,7 +397,33 @@ u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
   total_cal_us     += stop_us - start_us;
   total_cal_cycles += stage_max;
 
-  /* 成功！ */
+  /* OK, let's collect some stats about the performance of this test case.
+     This is used for fuzzing air time calculations in calculate_score(). */
+
+  q->exec_us     = (stop_us - start_us) / stage_max;
+  q->bitmap_size = count_bytes(trace_bits);
+  q->handicap    = handicap;
+  q->cal_failed  = 0;
+
+  total_bitmap_size += q->bitmap_size;
+  total_bitmap_entries++;
+
+  update_bitmap_score(q);
+
+  /* If this case didn't result in new output from the instrumentation, tell
+     parent. This is a non-critical problem, but something to warn the user
+     about. */
+
+  if (!dumb_mode && first_run && !fault && !new_bits) fault = FAULT_NOBITS;
+
+abort_calibration:
+
+  if (new_bits == 2 && !q->has_new_cov) {
+    q->has_new_cov = 1;
+    queued_with_cov++;
+  }
+
+  /* Mark variable paths. */
 
   if (var_detected) {
 
@@ -292,27 +436,6 @@ u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
 
   }
 
-  q->exec_us     = (stop_us - start_us) / stage_max;
-  q->bitmap_size = count_bytes(trace_bits);
-  q->handicap    = handicap;
-  q->cal_failed  = 0;
-
-  total_bitmap_size += q->bitmap_size;
-  total_bitmap_entries++;
-
-  update_bitmap_score(q);
-
-  /* 如果这个路径不计算对我们有价值的新覆盖，让我们标记它as redundant */
-
-  if (!dumb_mode && first_run && !fault && !new_bits) mark_as_redundant(q, !q->favored);
-
-  if (new_bits == 2 && !q->has_new_cov) {
-    q->has_new_cov = 1;
-    queued_with_cov++;
-  }
-
-  /* 将事情标记为正常 */
-
   stage_name = old_sn;
   stage_cur  = old_sc;
   stage_max  = old_sm;
@@ -321,18 +444,7 @@ u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
 
   return fault;
 
-abort_calibration:
-
-  if (new_bits == 2 && !q->has_new_cov) {
-    q->has_new_cov = 1;
-    queued_with_cov++;
-  }
-
-  q->cal_failed = fault;
-  stage_name = old_sn;
-  stage_cur  = old_sc;
-  stage_max  = old_sm;
-
-  return fault;
-
 }
+
+
+
