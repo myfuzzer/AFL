@@ -575,17 +575,7 @@ void check_crash_handling(void) {
      直到我有一台机器来测试代码。所以，目前，我们用
      糟糕的方式检查崩溃报告。*/
   
-  if (system("launchctl list 2>/dev/null | grep -q '\.ReportCrash
-
-
-
-
-
-
-
-
-
- ")) return;
+  if (system("launchctl list 2>/dev/null | grep -q '\\.ReportCrash$'")) return;
 
   SAYF("\n" cLRD "[-] " cRST
        "Whoops, your system is configured to forward crash notifications to an\n"
