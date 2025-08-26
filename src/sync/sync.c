@@ -14,7 +14,7 @@ extern u8 dumb_mode;
 
 
 
-/* Validate and fix up out_dir and sync_dir when using -S. */
+/* 在使用 -S 时验证并修复 out_dir 和 sync_dir。*/
 
 void fix_up_sync(void) {
 
@@ -58,12 +58,12 @@ void fix_up_sync(void) {
 
 
 
-/* When resuming, try to find the queue position to start from. This makes sense
-   only when resuming, and when we can find the original fuzzer_stats. */
+/* 恢复时，尝试找到要开始的队列位置。这仅在
+   恢复时有意义，并且当我们能找到原始的 fuzzer_stats 时。*/
 
 u32 find_start_position(void) {
 
-  static u8 tmp[4096]; /* Ought to be enough for anybody. */
+  static u8 tmp[4096]; /* 对任何人来说都应该足够了。*/
 
   u8  *fn, *off;
   s32 fd, i;
@@ -79,7 +79,7 @@ u32 find_start_position(void) {
 
   if (fd < 0) return 0;
 
-  i = read(fd, tmp, sizeof(tmp) - 1); (void)i; /* Ignore errors */
+  i = read(fd, tmp, sizeof(tmp) - 1); (void)i; /* 忽略错误 */
   close(fd);
 
   off = strstr(tmp, "cur_path          : ");
@@ -93,7 +93,7 @@ u32 find_start_position(void) {
 
 
 
-/* Grab interesting test cases from other fuzzers. */
+/* 从其他模糊器中获取有趣的测试用例。*/
 
 void sync_fuzzers(char** argv) {
 
@@ -107,7 +107,7 @@ void sync_fuzzers(char** argv) {
   stage_max = stage_cur = 0;
   cur_depth = 0;
 
-  /* Look at the entries created for every other fuzzer in the sync directory. */
+  /* 查看为同步目录中每个其他模糊器创建的条目。*/
 
   while ((sd_ent = readdir(sd))) {
 
@@ -120,11 +120,11 @@ void sync_fuzzers(char** argv) {
 
     s32 id_fd;
 
-    /* Skip dot files and our own output directory. */
+    /* 跳过点文件和我们自己的输出目录。*/
 
     if (sd_ent->d_name[0] == '.' || !strcmp(sync_id, sd_ent->d_name)) continue;
 
-    /* Skip anything that doesn't have a queue/ subdirectory. */
+    /* 跳过任何没有 queue/ 子目录的东西。*/
 
     qd_path = alloc_printf("%s/%s/queue", sync_dir, sd_ent->d_name);
 
@@ -133,7 +133,7 @@ void sync_fuzzers(char** argv) {
       continue;
     }
 
-    /* Retrieve the ID of the last seen test case. */
+    /* 检索上次看到的测试用例的 ID。*/
 
     qd_synced_path = alloc_printf("%s/.synced/%s", out_dir, sd_ent->d_name);
 
@@ -146,15 +146,15 @@ void sync_fuzzers(char** argv) {
 
     next_min_accept = min_accept;
 
-    /* Show stats */    
+    /* 显示统计信息 */    
 
     sprintf(stage_tmp, "sync %u", ++sync_cnt);
     stage_name = stage_tmp;
     stage_cur  = 0;
     stage_max  = 0;
 
-    /* For every file queued by this fuzzer, parse ID and see if we have looked at
-       it before; exec a test case if not. */
+    /* 对于此模糊器排队的每个文件，解析 ID 并查看我们是否
+       以前看过它；如果没看过，则执行一个测试用例。*/
 
     while ((qd_ent = readdir(qd))) {
 
@@ -166,14 +166,14 @@ void sync_fuzzers(char** argv) {
           sscanf(qd_ent->d_name, CASE_PREFIX "%06u", &syncing_case) != 1 || 
           syncing_case < min_accept) continue;
 
-      /* OK, sounds like a new one. Let's give it a try. */
+      /* 好的，听起来像是一个新的。让我们试试看。*/
 
       if (syncing_case >= next_min_accept)
         next_min_accept = syncing_case + 1;
 
       path = alloc_printf("%s/%s", qd_path, qd_ent->d_name);
 
-      /* Allow this to fail in case the other fuzzer is resuming or so... */
+      /* 允许此操作失败，以防其他模糊器正在恢复或类似情况…… */
 
       fd = open(path, O_RDONLY);
 
@@ -184,7 +184,7 @@ void sync_fuzzers(char** argv) {
 
       if (fstat(fd, &st)) PFATAL("fstat() failed");
 
-      /* Ignore zero-sized or oversized files. */
+      /* 忽略零大小或过大的文件。*/
 
       if (st.st_size && st.st_size <= MAX_FILE) {
 
@@ -193,8 +193,8 @@ void sync_fuzzers(char** argv) {
 
         if (mem == MAP_FAILED) PFATAL("Unable to mmap '%s'", path);
 
-        /* See what happens. We rely on save_if_interesting() to catch major
-           errors and save the test case. */
+        /* 看看会发生什么。我们依靠 save_if_interesting() 来捕获主要
+           错误并保存测试用例。*/
 
         write_to_testcase(mem, st.st_size);
 

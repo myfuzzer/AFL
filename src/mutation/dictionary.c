@@ -2,7 +2,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-/* Helper function for load_extras. */
+/* load_extras 的辅助函数。*/
 
 static int compare_extras_len(const void* p1, const void* p2) {
   struct extra_data *e1 = (struct extra_data*)p1,
@@ -20,7 +20,7 @@ static int compare_extras_use_d(const void* p1, const void* p2) {
 
 
 
-/* Read extras from a file, sort by size. */
+/* 从文件读取附加内容，按大小排序。*/
 
 static void load_extras_file(u8* fname, u32* min_len, u32* max_len,
                              u32 dict_level) {
@@ -41,7 +41,7 @@ static void load_extras_file(u8* fname, u32* min_len, u32* max_len,
 
     cur_line++;
 
-    /* Trim on left and right. */
+    /* 修剪左右两边。*/
 
     while (isspace(*lptr)) lptr++;
 
@@ -50,11 +50,11 @@ static void load_extras_file(u8* fname, u32* min_len, u32* max_len,
     rptr++;
     *rptr = 0;
 
-    /* Skip empty lines and comments. */
+    /* 跳过空行和注释。*/
 
     if (!*lptr || *lptr == '#') continue;
 
-    /* All other lines must end with '"', which we can consume. */
+    /* 所有其他行必须以“"”结尾，我们可以消费它。*/
 
     rptr--;
 
@@ -63,11 +63,11 @@ static void load_extras_file(u8* fname, u32* min_len, u32* max_len,
 
     *rptr = 0;
 
-    /* Skip alphanumerics and dashes (label). */
+    /* 跳过字母数字和破折号（标签）。*/
 
     while (isalnum(*lptr) || *lptr == '_') lptr++;
 
-    /* If @number follows, parse that. */
+    /* 如果后面跟着@number，则解析它。*/
 
     if (*lptr == '@') {
 
@@ -77,11 +77,11 @@ static void load_extras_file(u8* fname, u32* min_len, u32* max_len,
 
     }
 
-    /* Skip whitespace and = signs. */
+    /* 跳过空格和=号。*/
 
     while (isspace(*lptr) || *lptr == '=') lptr++;
 
-    /* Consume opening '"'. */
+    /* 消费开头的“"”。*/
 
     if (*lptr != '"')
       FATAL("Malformed name=\"keyword\" pair in line %u.", cur_line);
@@ -90,8 +90,8 @@ static void load_extras_file(u8* fname, u32* min_len, u32* max_len,
 
     if (!*lptr) FATAL("Empty keyword in line %u.", cur_line);
 
-    /* Okay, let's allocate memory and copy data between "...", handling
-       \xNN escaping, \\, and \". */
+    /* 好的，让我们分配内存并在“...”之间复制数据，处理
+       \xNN 转义、\\ 和 \"。*/
 
     extras = ck_realloc_block(extras, (extras_cnt + 1) *
                sizeof(struct extra_data));
@@ -158,7 +158,7 @@ static void load_extras_file(u8* fname, u32* min_len, u32* max_len,
 
 
 
-/* Read extras from the extras directory and sort them by size. */
+/* 从附加目录中读取附加内容并按大小排序。*/
 
 void load_extras(u8* dir) {
 
@@ -167,7 +167,7 @@ void load_extras(u8* dir) {
   u32 min_len = MAX_DICT_FILE, max_len = 0, dict_level = 0;
   u8* x;
 
-  /* If the name ends with @, extract level and continue. */
+  /* 如果名称以@结尾，则提取级别并继续。*/
 
   if ((x = strchr(dir, '@'))) {
 
@@ -202,7 +202,7 @@ void load_extras(u8* dir) {
     if (lstat(fn, &st) || access(fn, R_OK))
       PFATAL("Unable to access '%s'", fn);
 
-    /* This also takes care of . and .. */
+    /* 这也处理了 . 和 .. */
     if (!S_ISREG(st.st_mode) || !st.st_size) {
 
       ck_free(fn);
@@ -259,30 +259,30 @@ check_and_sort:
 
 
 
-/* Maybe add automatic extra. */
+/* 可能会添加自动附加内容。*/
 
 void maybe_add_auto(u8* mem, u32 len) {
 
   u32 i;
 
-  /* Allow users to specify that they don't want auto dictionaries. */
+  /* 允许用户指定他们不想要自动字典。*/
 
   if (!MAX_AUTO_EXTRAS || !USE_AUTO_EXTRAS) return;
 
-  /* Skip runs of identical bytes. */
+  /* 跳过相同字节的运行。*/
 
   for (i = 1; i < len; i++)
     if (mem[0] ^ mem[i]) break;
 
   if (i == len) return;
 
-  /* Reject builtin interesting values. */
+  /* 拒绝内置的有趣值。*/
 
   if (len == 2) {
 
     i = sizeof(interesting_16) >> 1;
 
-    while (i--) 
+    while (i--)
       if (*((u16*)mem) == interesting_16[i] ||
           *((u16*)mem) == SWAP16(interesting_16[i])) return;
 
@@ -292,15 +292,14 @@ void maybe_add_auto(u8* mem, u32 len) {
 
     i = sizeof(interesting_32) >> 2;
 
-    while (i--) 
+    while (i--)
       if (*((u32*)mem) == interesting_32[i] ||
           *((u32*)mem) == SWAP32(interesting_32[i])) return;
 
   }
 
-  /* Reject anything that matches existing extras. Do a case-insensitive
-     match. We optimize by exploiting the fact that extras[] are sorted
-     by size. */
+  /* 拒绝任何与现有附加内容匹配的内容。进行不区分大小写的
+     匹配。我们通过利用 extras[] 按大小排序的事实进行优化。*/
 
   for (i = 0; i < extras_cnt; i++)
     if (extras[i].len >= len) break;
@@ -308,8 +307,8 @@ void maybe_add_auto(u8* mem, u32 len) {
   for (; i < extras_cnt && extras[i].len == len; i++)
     if (!memcmp_nocase(extras[i].data, mem, len)) return;
 
-  /* Last but not least, check a_extras[] for matches. There are no
-     guarantees of a particular sort order. */
+  /* 最后但并非最不重要的一点是，检查 a_extras[] 是否匹配。没有
+     特定排序顺序的保证。*/
 
   auto_changed = 1;
 
@@ -324,9 +323,9 @@ void maybe_add_auto(u8* mem, u32 len) {
 
   }
 
-  /* At this point, looks like we're dealing with a new entry. So, let's
-     append it if we have room. Otherwise, let's randomly evict some other
-     entry from the bottom half of the list. */
+  /* 此时，看起来我们正在处理一个新条目。所以，如果
+     我们有空间，就附加它。否则，让我们从列表的下半部分随机
+     驱逐一些其他条目。*/
 
   if (a_extras_cnt < MAX_AUTO_EXTRAS) {
 
@@ -352,12 +351,12 @@ void maybe_add_auto(u8* mem, u32 len) {
 
 sort_a_extras:
 
-  /* First, sort all auto extras by use count, descending order. */
+  /* 首先，按使用计数降序对所有自动附加内容进行排序。*/
 
   qsort(a_extras, a_extras_cnt, sizeof(struct extra_data),
         compare_extras_use_d);
 
-  /* Then, sort the top USE_AUTO_EXTRAS entries by size. */
+  /* 然后，按大小对前 USE_AUTO_EXTRAS 个条目进行排序。*/
 
   qsort(a_extras, MIN(USE_AUTO_EXTRAS, a_extras_cnt),
         sizeof(struct extra_data), compare_extras_len);
@@ -366,7 +365,7 @@ sort_a_extras:
 
 
 
-/* Load automatically generated extras. */
+/* 加载自动生成的附加内容。*/
 
 void load_auto(void) {
 
@@ -388,8 +387,8 @@ void load_auto(void) {
 
     }
 
-    /* We read one byte more to cheaply detect tokens that are too
-       long (and skip them). */
+    /* 我们多读一个字节以廉价地检测太长的令牌
+       （并跳过它们）。*/
 
     len = read(fd, tmp, MAX_AUTO_EXTRA + 1);
 
@@ -410,7 +409,7 @@ void load_auto(void) {
 
 
 
-/* Destroy extras. */
+/* 销毁附加内容。*/
 
 void destroy_extras(void) {
 

@@ -34,8 +34,8 @@ void show_stats(void);
 u8 has_new_bits(u8* virgin_map);
 
 
-/* Execute target application, monitoring for timeouts. Return status
-   information. The called program will update trace_bits[]. */
+/* 执行目标应用程序，监控超时。返回状态
+   信息。被调用的程序将更新 trace_bits[]。*/
 
 u8 run_target(char** argv, u32 timeout) {
 
@@ -48,17 +48,17 @@ u8 run_target(char** argv, u32 timeout) {
 
   child_timed_out = 0;
 
-  /* After this memset, trace_bits[] are effectively volatile, so we
-     must prevent any earlier operations from venturing into that
-     territory. */
+  /* 在这个 memset 之后，trace_bits[] 实际上是易失的，所以我们
+     必须防止任何更早的操作进入那个
+     领域。*/
 
   memset(trace_bits, 0, MAP_SIZE);
   MEM_BARRIER();
 
-  /* If we're running in "dumb" mode, we can't rely on the fork server
-     logic compiled into the target program, so we will just keep calling
-     execve(). There is a bit of code duplication between here and 
-     init_forkserver(), but c'est la vie. */
+  /* 如果我们以“哑”模式运行，我们不能依赖于编译到
+     目标程序中的 fork server 逻辑，所以我们将只是不断地调用
+     execve()。这里和 
+     init_forkserver() 之间有一点代码重复，但生活就是这样。*/
 
   if (dumb_mode == 1 || no_forkserver) {
 
@@ -76,11 +76,11 @@ u8 run_target(char** argv, u32 timeout) {
 
 #ifdef RLIMIT_AS
 
-        setrlimit(RLIMIT_AS, &r); /* Ignore errors */
+        setrlimit(RLIMIT_AS, &r); /* 忽略错误 */
 
 #else
 
-        setrlimit(RLIMIT_DATA, &r); /* Ignore errors */
+        setrlimit(RLIMIT_DATA, &r); /* 忽略错误 */
 
 #endif /* ^RLIMIT_AS */
 
@@ -88,10 +88,10 @@ u8 run_target(char** argv, u32 timeout) {
 
       r.rlim_max = r.rlim_cur = 0;
 
-      setrlimit(RLIMIT_CORE, &r); /* Ignore errors */
+      setrlimit(RLIMIT_CORE, &r); /* 忽略错误 */
 
-      /* Isolate the process and configure standard descriptors. If out_file is
-         specified, stdin is /dev/null; otherwise, out_fd is cloned instead. */
+      /* 隔离进程并配置标准描述符。如果指定了 out_file，
+         则 stdin 为 /dev/null；否则，将克隆 out_fd。*/
 
       setsid();
 
@@ -109,14 +109,14 @@ u8 run_target(char** argv, u32 timeout) {
 
       }
 
-      /* On Linux, would be faster to use O_CLOEXEC. Maybe TODO. */
+      /* 在 Linux 上，使用 O_CLOEXEC 会更快。也许是 TODO。*/
 
       close(dev_null_fd);
       close(out_dir_fd);
       close(dev_urandom_fd);
       close(fileno(plot_file));
 
-      /* Set sane defaults for ASAN if nothing else specified. */
+      /* 如果没有指定其他内容，则为 ASAN 设置合理的默认值。*/
 
       setenv("ASAN_OPTIONS", "abort_on_error=1:"
                              "detect_leaks=0:"
@@ -129,8 +129,8 @@ u8 run_target(char** argv, u32 timeout) {
 
       execv(target_path, argv);
 
-      /* Use a distinctive bitmap value to tell the parent about execv()
-         falling through. */
+      /* 使用一个独特的位图值来告诉父进程 execv()
+         失败了。*/
 
       *(u32*)trace_bits = EXEC_FAIL_SIG;
       exit(0);
@@ -141,8 +141,8 @@ u8 run_target(char** argv, u32 timeout) {
 
     s32 res;
 
-    /* In non-dumb mode, we have the fork server up and running, so simply
-       tell it to have at it, and then read back PID. */
+    /* 在非哑模式下，我们有 fork server 正在运行，所以只需
+       告诉它开始工作，然后读回 PID。*/
 
     if ((res = write(fsrv_ctl_fd, &prev_timed_out, 4)) != 4) {
 
@@ -162,14 +162,14 @@ u8 run_target(char** argv, u32 timeout) {
 
   }
 
-  /* Configure timeout, as requested by user, then wait for child to terminate. */
+  /* 根据用户的要求配置超时，然后等待子进程终止。*/
 
   it.it_value.tv_sec = (timeout / 1000);
   it.it_value.tv_usec = (timeout % 1000) * 1000;
 
   setitimer(ITIMER_REAL, &it, NULL);
 
-  /* The SIGALRM handler simply kills the child_pid and sets child_timed_out. */
+  /* SIGALRM 处理程序只是杀死 child_pid 并设置 child_timed_out。*/
 
   if (dumb_mode == 1 || no_forkserver) {
 
@@ -201,9 +201,9 @@ u8 run_target(char** argv, u32 timeout) {
 
   total_execs++;
 
-  /* Any subsequent operations on trace_bits must not be moved by the
-     compiler below this point. Past this location, trace_bits[] behave
-     very normally and do not have to be treated as volatile. */
+  /* 任何后续对 trace_bits 的操作都不能被编译器移动到
+     此点以下。在此位置之后，trace_bits[] 的行为
+     非常正常，不必被视为易失的。*/
 
   MEM_BARRIER();
 
@@ -217,7 +217,7 @@ u8 run_target(char** argv, u32 timeout) {
 
   prev_timed_out = child_timed_out;
 
-  /* Report outcome to caller. */
+  /* 向调用者报告结果。*/
 
   if (WIFSIGNALED(status) && !stop_soon) {
 
@@ -229,8 +229,8 @@ u8 run_target(char** argv, u32 timeout) {
 
   }
 
-  /* A somewhat nasty hack for MSAN, which doesn't support abort_on_error and
-     must use a special exit code. */
+  /* 一个有点讨厌的 MSAN hack，它不支持 abort_on_error 并且
+     必须使用一个特殊的退出代码。*/
 
   if (uses_asan && WEXITSTATUS(status) == MSAN_ERROR) {
     kill_signal = 0;
@@ -240,8 +240,7 @@ u8 run_target(char** argv, u32 timeout) {
   if ((dumb_mode == 1 || no_forkserver) && tb4 == EXEC_FAIL_SIG)
     return FAULT_ERROR;
 
-  /* It makes sense to account for the slowest units only if the testcase was run
-  under the user defined timeout. */
+  /* 只有在用户定义的超时下运行测试用例时，才考虑最慢的单元是有意义的。*/
   if (!(timeout > exec_tmout) && (slowest_exec_ms < exec_ms)) {
     slowest_exec_ms = exec_ms;
   }
@@ -253,9 +252,9 @@ u8 run_target(char** argv, u32 timeout) {
 
 
 
-/* Write modified data to file for testing. If out_file is set, the old file
-   is unlinked and a new one is created. Otherwise, out_fd is rewound and
-   truncated. */
+/* 将修改后的数据写入文件以进行测试。如果设置了 out_file，则旧文件
+   将被取消链接并创建一个新文件。否则，out_fd 将被倒回并
+   截断。*/
 
 void write_to_testcase(void* mem, u32 len) {
 
@@ -263,7 +262,7 @@ void write_to_testcase(void* mem, u32 len) {
 
   if (out_file) {
 
-    unlink(out_file); /* Ignore errors. */
+    unlink(out_file); /* 忽略错误。*/
 
     fd = open(out_file, O_WRONLY | O_CREAT | O_EXCL, 0600);
 
@@ -283,9 +282,9 @@ void write_to_testcase(void* mem, u32 len) {
 }
 
 
-/* Calibrate a new test case. This is done when processing the input directory
-   to warn about flaky or otherwise problematic test cases early on; and when
-   new paths are discovered to detect variable behavior and so on. */
+/* 校准一个新的测试用例。这在处理输入目录时完成，
+   以便及早警告有关不稳定或其他有问题的测试用例；以及当
+   发现新路径以检测可变行为等时。*/
 
 u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
                          u32 handicap, u8 from_queue) {
@@ -301,9 +300,9 @@ u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
   u32 use_tmout = exec_tmout;
   u8* old_sn = stage_name;
 
-  /* Be a bit more generous about timeouts when resuming sessions, or when
-     trying to calibrate already-added finds. This helps avoid trouble due
-     to intermittent latency. */
+  /* 在恢复会话时，或者在
+     尝试校准已添加的发现时，对超时要更宽容一些。这有助于避免由于
+     间歇性延迟而引起的问题。*/
 
   if (!from_queue || resuming_fuzz)
     use_tmout = MAX(exec_tmout + CAL_TMOUT_ADD,
@@ -314,8 +313,8 @@ u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
   stage_name = "calibration";
   stage_max  = fast_cal ? 3 : CAL_CYCLES;
 
-  /* Make sure the forkserver is up before we do anything, and let's not
-     count its spin-up time toward binary calibration. */
+  /* 在我们做任何事情之前，确保 forkserver 已经启动，并且我们不
+     将其启动时间计入二进制文件校准。*/
 
   if (dumb_mode != 1 && !no_forkserver && !forksrv_pid)
     init_forkserver(argv);
@@ -340,8 +339,8 @@ u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
 
     fault = run_target(argv, use_tmout);
 
-    /* stop_soon is set by the handler for Ctrl+C. When it's pressed,
-       we want to bail out quickly. */
+    /* stop_soon 由 Ctrl+C 的处理程序设置。当它被按下时，
+       我们希望快速退出。*/
 
     if (stop_soon || fault != crash_mode) goto abort_calibration;
 
@@ -390,8 +389,8 @@ u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
   total_cal_us     += stop_us - start_us;
   total_cal_cycles += stage_max;
 
-  /* OK, let's collect some stats about the performance of this test case.
-     This is used for fuzzing air time calculations in calculate_score(). */
+  /* 好的，让我们收集一些关于这个测试用例性能的统计数据。
+     这用于在 calculate_score() 中计算模糊测试的播出时间。*/
 
   q->exec_us     = (stop_us - start_us) / stage_max;
   q->bitmap_size = count_bytes(trace_bits);
@@ -403,9 +402,8 @@ u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
 
   update_bitmap_score(q);
 
-  /* If this case didn't result in new output from the instrumentation, tell
-     parent. This is a non-critical problem, but something to warn the user
-     about. */
+  /* 如果这个案例没有从插桩中产生新的输出，告诉
+     父进程。这是一个非关键问题，但需要警告用户。*/
 
   if (!dumb_mode && first_run && !fault && !new_bits) fault = FAULT_NOBITS;
 
@@ -416,7 +414,7 @@ abort_calibration:
     queued_with_cov++;
   }
 
-  /* Mark variable paths. */
+  /* 标记可变路径。*/
 
   if (var_detected) {
 
@@ -439,8 +437,8 @@ abort_calibration:
 
 }
 
-/* Perform dry run of all test cases to confirm that the app is working as
-   expected. This is done only for the initial inputs, and only once. */
+/* 对所有测试用例进行空运行，以确认应用程序按预期工作。
+   这仅对初始输入执行一次。*/
 
 void perform_dry_run(char** argv) {
 
@@ -491,9 +489,8 @@ void perform_dry_run(char** argv) {
 
         if (timeout_given) {
 
-          /* The -t nn+ syntax in the command line sets timeout_given to '2' and
-             instructs afl-fuzz to tolerate but skip queue entries that time
-             out. */
+          /* 命令行中的 -t nn+ 语法将 timeout_given 设置为 '2' 并
+             指示 afl-fuzz 容忍但跳过超时的队列条目。*/
 
           if (timeout_given > 1) {
             WARNF("Test case results in a timeout (skipping)");
@@ -644,9 +641,9 @@ void perform_dry_run(char** argv) {
 }
 
 
-/* Write a modified test case, run program, process results. Handle
-   error conditions, returning 1 if it's time to bail out. This is
-   a helper function for fuzz_one(). */
+/* 编写一个修改后的测试用例，运行程序，处理结果。处理
+   错误条件，返回 1 如果需要退出。这是
+   fuzz_one() 的一个辅助函数。*/
 
 u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
 
@@ -674,8 +671,7 @@ u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
 
   } else subseq_tmouts = 0;
 
-  /* Users can hit us with SIGUSR1 to request the current input
-     to be abandoned. */
+  /* 用户可以向我们发送 SIGUSR1 来请求放弃当前输入。*/
 
   if (skip_requested) {
 
@@ -685,7 +681,7 @@ u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
 
   }
 
-  /* This handles FAULT_ERROR for us: */
+  /* 这为我们处理了 FAULT_ERROR：*/
 
   queued_discovered += save_if_interesting(argv, out_buf, len, fault);
 

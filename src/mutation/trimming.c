@@ -1,8 +1,8 @@
 #include "mutations.h"
 
-/* Trim all new test cases to save cycles when doing deterministic checks. The
-   trimmer uses power-of-two increments somewhere between 1/16 and 1/1024 of
-   file size, to keep the stage short and sweet. */
+/* 修剪所有新的测试用例，以在进行确定性检查时节省周期。 
+   修剪器使用介于文件大小的 1/16 和 1/1024 之间的
+   2 的幂次方增量，以保持阶段简短而有效。*/
 
 u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
 
@@ -14,23 +14,23 @@ u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
   u32 remove_len;
   u32 len_p2;
 
-  /* Although the trimmer will be less useful when variable behavior is
-     detected, it will still work to some extent, so we don't check for
-     this. */
+  /* 尽管在检测到可变行为时修剪器将不那么有用，
+     但它在某种程度上仍然有效，所以我们不检查
+     这个。*/
 
   if (q->len < 5) return 0;
 
   stage_name = tmp;
   bytes_trim_in += q->len;
 
-  /* Select initial chunk len, starting with large steps. */
+  /* 选择初始块长度，从大步长开始。*/
 
   len_p2 = next_p2(q->len);
 
   remove_len = MAX(len_p2 / TRIM_START_STEPS, TRIM_MIN_BYTES);
 
-  /* Continue until the number of steps gets too high or the stepover
-     gets too small. */
+  /* 继续，直到步数变得太高或步长
+     变得太小。*/
 
   while (remove_len >= MAX(len_p2 / TRIM_END_STEPS, TRIM_MIN_BYTES)) {
 
@@ -53,14 +53,13 @@ u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
 
       if (stop_soon || fault == FAULT_ERROR) goto abort_trimming;
 
-      /* Note that we don't keep track of crashes or hangs here; maybe TODO? */
+      /* 注意，我们在这里不跟踪崩溃或挂起；也许是 TODO？*/
 
       cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
 
-      /* If the deletion had no impact on the trace, make it permanent. This
-         isn't perfect for variable-path inputs, but we're just making a
-         best-effort pass, so it's not a big deal if we end up with false
-         negatives every now and then. */
+      /* 如果删除对跟踪没有影响，则使其永久化。这
+         对于可变路径输入来说并不完美，但我们只是在尽力而为，
+         所以如果我们偶尔得到假阴性，也不是什么大问题。*/
 
       if (cksum == q->exec_cksum) {
 
@@ -72,8 +71,8 @@ u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
         memmove(in_buf + remove_pos, in_buf + remove_pos + trim_avail, 
                 move_tail);
 
-        /* Let's save a clean trace, which will be needed by
-           update_bitmap_score once we're done with the trimming stuff. */
+        /* 让我们保存一个干净的跟踪，一旦我们完成了修剪工作，
+           update_bitmap_score 将需要它。*/
 
         if (!needs_write) {
 
@@ -84,7 +83,7 @@ u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
 
       } else remove_pos += remove_len;
 
-      /* Since this can be slow, update the screen every now and then. */
+      /* 因为这可能很慢，所以不时更新屏幕。*/
 
       if (!(trim_exec++ % stats_update_freq)) show_stats();
       stage_cur++;
@@ -95,14 +94,14 @@ u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
 
   }
 
-  /* If we have made changes to in_buf, we also need to update the on-disk
-     version of the test case. */
+  /* 如果我们对 in_buf 进行了更改，我们还需要更新
+     测试用例的磁盘版本。*/
 
   if (needs_write) {
 
     s32 fd;
 
-    unlink(q->fname); /* ignore errors */
+    unlink(q->fname); /* 忽略错误 */
 
     fd = open(q->fname, O_WRONLY | O_CREAT | O_EXCL, 0600);
 
@@ -124,7 +123,7 @@ abort_trimming:
 }
 
 
-/* Helper function for maybe_add_auto() */
+/* maybe_add_auto() 的辅助函数 */
 
 u8 memcmp_nocase(u8* m1, u8* m2, u32 len) {
 

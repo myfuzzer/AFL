@@ -7,9 +7,9 @@ extern u8* out_dir;
 
 
 
-/* Write bitmap to file. The bitmap is useful mostly for the secret
-   -B option, to focus a separate fuzzing session on a particular
-   interesting input without rediscovering all the others. */
+/* 将位图写入文件。位图主要用于秘密的
+   -B 选项，以便将单独的模糊测试会话集中在特定的
+   有趣的输入上，而无需重新发现所有其他输入。*/
 
 void write_bitmap(void) {
 
@@ -31,7 +31,7 @@ void write_bitmap(void) {
 
 }
 
-/* Examine map coverage. Called once, for first test case. */
+/* 检查映射覆盖率。为第一个测试用例调用一次。*/
 
 void check_map_coverage(void) {
 

@@ -6,7 +6,7 @@
 
 
 
-/* Helper function: link() if possible, copy otherwise. */
+/* 辅助函数：如果可能，使用 link()，否则复制。*/
 
 void link_or_copy(u8* old_path, u8* new_path) {
 
@@ -41,9 +41,7 @@ void link_or_copy(u8* old_path, u8* new_path) {
 
 
 
-
-
-/* The same, but with an adjustable gap. Used for trimming. */
+/* 同样，但带有可调整的间隙。用于修剪。*/
 
 void write_with_gap(void* mem, u32 len, u32 skip_at, u32 skip_len) {
 
@@ -52,7 +50,7 @@ void write_with_gap(void* mem, u32 len, u32 skip_at, u32 skip_len) {
 
   if (out_file) {
 
-    unlink(out_file); /* Ignore errors. */
+    unlink(out_file); /* 忽略错误。*/
 
     fd = open(out_file, O_WRONLY | O_CREAT | O_EXCL, 0600);
 
@@ -77,9 +75,8 @@ void write_with_gap(void* mem, u32 len, u32 skip_at, u32 skip_len) {
 
 
 
-
-/* Read all testcases from the input directory, then queue them for testing.
-   Called at startup. */
+/* 从输入目录读取所有测试用例，然后将它们排队等待测试。
+   在启动时调用。*/
 
 void read_testcases(void) {
 
@@ -88,16 +85,16 @@ void read_testcases(void) {
   u32 i;
   u8* fn;
 
-  /* Auto-detect non-in-place resumption attempts. */
+  /* 自动检测非就地恢复尝试。*/
 
   fn = alloc_printf("%s/queue", in_dir);
   if (!access(fn, F_OK)) in_dir = fn; else ck_free(fn);
 
   ACTF("Scanning '%s'...", in_dir);
 
-  /* We use scandir() + alphasort() rather than readdir() because otherwise,
-     the ordering  of test cases would vary somewhat randomly and would be
-     difficult to control. */
+  /* 我们使用 scandir() + alphasort() 而不是 readdir()，因为否则，
+     测试用例的排序会有些随机，并且难以
+     控制。*/
 
   nl_cnt = scandir(in_dir, &nl, NULL, alphasort);
 
@@ -131,12 +128,12 @@ void read_testcases(void) {
 
     u8  passed_det = 0;
 
-    free(nl[i]); /* not tracked */
+    free(nl[i]); /* 未跟踪 */
  
     if (lstat(fn, &st) || access(fn, R_OK))
       PFATAL("Unable to access '%s'", fn);
 
-    /* This also takes care of . and .. */
+    /* 这也处理了 . 和 .. */
 
     if (!S_ISREG(st.st_mode) || !st.st_size || strstr(fn, "/README.testcases")) {
 
@@ -150,10 +147,9 @@ void read_testcases(void) {
       FATAL("Test case '%s' is too big (%s, limit is %s)", fn,
             DMS(st.st_size), DMS(MAX_FILE));
 
-    /* Check for metadata that indicates that deterministic fuzzing
-       is complete for this entry. We don't want to repeat deterministic
-       fuzzing when resuming aborted scans, because it would be pointless
-       and probably very time-consuming. */
+    /* 检查元数据，该元数据指示此条目的确定性模糊测试
+       已完成。我们不希望在恢复中止的扫描时重复确定性
+       模糊测试，因为这将是毫无意义的，而且可能非常耗时。*/
 
     if (!access(dfn, F_OK)) passed_det = 1;
     ck_free(dfn);
@@ -162,7 +158,7 @@ void read_testcases(void) {
 
   }
 
-  free(nl); /* not tracked */
+  free(nl); /* 未跟踪 */
 
   if (!queued_paths) {
 
@@ -181,8 +177,8 @@ void read_testcases(void) {
 
 }
 
-/* Create hard links for input test cases in the output directory, choosing
-   good names and pivoting accordingly. */
+/* 在输出目录中为输入测试用例创建硬链接，选择
+   好名称并相应地进行调整。*/
 
 void pivot_inputs(void) {
 
@@ -198,9 +194,9 @@ void pivot_inputs(void) {
 
     if (!rsl) rsl = q->fname; else rsl++;
 
-    /* If the original file name conforms to the syntax and the recorded
-       ID matches the one we'd assign, just use the original file name.
-       This is valuable for resuming fuzzing runs. */
+    /* 如果原始文件名符合语法，并且记录的
+       ID 与我们将分配的 ID 匹配，则只使用原始文件名。
+       这对于恢复模糊测试运行很有价值。*/
 
 #ifndef SIMPLE_FILES
 #  define CASE_PREFIX "id:"
@@ -217,8 +213,8 @@ void pivot_inputs(void) {
       resuming_fuzz = 1;
       nfn = alloc_printf("%s/queue/%s", out_dir, rsl);
 
-      /* Since we're at it, let's also try to find parent and figure out the
-         appropriate depth for this entry. */
+      /* 既然我们正在做这件事，让我们也尝试找到父级并找出
+         此条目的适当深度。*/
 
       src_str = strchr(rsl + 3, ':');
 
@@ -234,8 +230,8 @@ void pivot_inputs(void) {
 
     } else {
 
-      /* No dice - invent a new name, capturing the original one as a
-         substring. */
+      /* 没戏 - 发明一个新名称，将原始名称捕获为
+         子字符串。*/
 
 #ifndef SIMPLE_FILES
 
@@ -252,13 +248,13 @@ void pivot_inputs(void) {
 
     }
 
-    /* Pivot to the new queue entry. */
+    /* 转向新的队列条目。*/
 
     link_or_copy(q->fname, nfn);
     ck_free(q->fname);
     q->fname = nfn;
 
-    /* Make sure that the passed_det value carries over, too. */
+    /* 确保 passed_det 值也延续下去。*/
 
     if (q->passed_det) mark_as_det_done(q);
 
@@ -273,7 +269,7 @@ void pivot_inputs(void) {
 
 
 
-/* Write a message accompanying the crash directory :-) */
+/* 编写一条伴随崩溃目录的消息 :-) */
 
 void write_crash_readme(void) {
 
@@ -284,7 +280,7 @@ void write_crash_readme(void) {
   fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, 0600);
   ck_free(fn);
 
-  /* Do not die on errors here - that would be impolite. */
+  /* 在这里不要因错误而死 - 那样会很不礼貌。*/
 
   if (fd < 0) return;
 
@@ -313,7 +309,7 @@ void write_crash_readme(void) {
 
              "Thanks :-)\n",
 
-             orig_cmdline, DMS(mem_limit << 20)); /* ignore errors */
+             orig_cmdline, DMS(mem_limit << 20)); /* 忽略错误 */
 
   fclose(f);
 
@@ -321,8 +317,8 @@ void write_crash_readme(void) {
 
 
 
-/* A helper function for maybe_delete_out_dir(), deleting all prefixed
-   files in a directory. */
+/* maybe_delete_out_dir() 的辅助函数，删除目录中所有带前缀的
+   文件。*/
 
 static u8 delete_files(u8* path, u8* prefix) {
 
@@ -354,7 +350,7 @@ static u8 delete_files(u8* path, u8* prefix) {
 
 
 
-/* Delete the temporary directory used for in-place session resume. */
+/* 删除用于就地会话恢复的临时目录。*/
 
 void nuke_resume_dir(void) {
 
@@ -394,17 +390,17 @@ dir_cleanup_failed:
 
 
 
-/* Delete fuzzer output directory if we recognize it as ours, if the fuzzer
-   is not currently running, and if the last run time isn't too great. */
+/* 如果我们识别出 fuzzer 输出目录是我们的，如果 fuzzer
+   当前未运行，并且如果上次运行时间不是太长，则删除它。*/
 
 static void maybe_delete_out_dir(void) {
 
   FILE* f;
   u8 *fn = alloc_printf("%s/fuzzer_stats", out_dir);
 
-  /* See if the output directory is locked. If yes, bail out. If not,
-     create a lock that will persist for the lifetime of the process
-     (this requires leaving the descriptor open).*/
+  /* 查看输出目录是否被锁定。如果是，则退出。如果不是，
+     创建一个将持续到进程生命周期的锁
+     （这需要保持描述符打开）。*/
 
   out_dir_fd = open(out_dir, O_RDONLY);
   if (out_dir_fd < 0) PFATAL("Unable to open '%s'", out_dir);
@@ -437,7 +433,7 @@ static void maybe_delete_out_dir(void) {
 
     fclose(f);
 
-    /* Let's see how much work is at stake. */
+    /* 让我们看看有多少工作处于危险之中。*/
 
     if (!in_place_resume && last_update - start_time > OUTPUT_GRACE * 60) {
 
@@ -459,11 +455,11 @@ static void maybe_delete_out_dir(void) {
 
   ck_free(fn);
 
-  /* The idea for in-place resume is pretty simple: we temporarily move the old
-     queue/ to a new location that gets deleted once import to the new queue/
-     is finished. If _resume/ already exists, the current queue/ may be
-     incomplete due to an earlier abort, so we want to use the old _resume/
-     dir instead, and we let rename() fail silently. */
+  /* 就地恢复的想法非常简单：我们暂时将旧的
+     queue/ 移动到一个新位置，一旦导入到新的 queue/
+     完成，该位置就会被删除。如果 _resume/ 已经存在，当前的 queue/ 可能
+     由于较早的中止而不完整，因此我们希望使用旧的 _resume/
+     目录，并且我们让 rename() 静默失败。*/
 
   if (in_place_resume) {
 
@@ -471,7 +467,7 @@ static void maybe_delete_out_dir(void) {
 
     in_dir = alloc_printf("%s/_resume", out_dir);
 
-    rename(orig_q, in_dir); /* Ignore errors */
+    rename(orig_q, in_dir); /* 忽略错误 */
 
     OKF("Output directory exists, will attempt session resume.");
 
@@ -485,8 +481,8 @@ static void maybe_delete_out_dir(void) {
 
   ACTF("Deleting old session data...");
 
-  /* Okay, let's get the ball rolling! First, we need to get rid of the entries
-     in <out_dir>/.synced/.../id:*, if any are present. */
+  /* 好的，让我们开始吧！首先，我们需要摆脱
+     <out_dir>/.synced/.../id:* 中的条目（如果存在）。*/
 
   if (!in_place_resume) {
 
@@ -496,7 +492,7 @@ static void maybe_delete_out_dir(void) {
 
   }
 
-  /* Next, we need to clean up <out_dir>/queue/.state/ subdirectories: */
+  /* 接下来，我们需要清理 <out_dir>/queue/.state/ 子目录：*/
 
   fn = alloc_printf("%s/queue/.state/deterministic_done", out_dir);
   if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
@@ -514,8 +510,8 @@ static void maybe_delete_out_dir(void) {
   if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
   ck_free(fn);
 
-  /* Then, get rid of the .state subdirectory itself (should be empty by now)
-     and everything matching <out_dir>/queue/id:*. */
+  /* 然后，摆脱 .state 子目录本身（现在应该为空）
+     以及与 <out_dir>/queue/id:* 匹配的所有内容。*/
 
   fn = alloc_printf("%s/queue/.state", out_dir);
   if (rmdir(fn) && errno != ENOENT) goto dir_cleanup_failed;
@@ -525,20 +521,20 @@ static void maybe_delete_out_dir(void) {
   if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
   ck_free(fn);
 
-  /* All right, let's do <out_dir>/crashes/id:* and <out_dir>/hangs/id:*. */
+  /* 好的，让我们处理 <out_dir>/crashes/id:* 和 <out_dir>/hangs/id:*。*/
 
   if (!in_place_resume) {
 
     fn = alloc_printf("%s/crashes/README.txt", out_dir);
-    unlink(fn); /* Ignore errors */
+    unlink(fn); /* 忽略错误 */
     ck_free(fn);
 
   }
 
   fn = alloc_printf("%s/crashes", out_dir);
 
-  /* Make backup of the crashes directory if it's not empty and if we're
-     doing in-place resume. */
+  /* 如果崩溃目录不为空并且我们正在
+     进行就地恢复，则备份崩溃目录。*/
 
   if (in_place_resume && rmdir(fn)) {
 
@@ -559,7 +555,7 @@ static void maybe_delete_out_dir(void) {
 
 #endif /* ^!SIMPLE_FILES */
 
-    rename(fn, nfn); /* Ignore errors. */
+    rename(fn, nfn); /* 忽略错误。*/
     ck_free(nfn);
 
   }
@@ -569,7 +565,7 @@ static void maybe_delete_out_dir(void) {
 
   fn = alloc_printf("%s/hangs", out_dir);
 
-  /* Backup hangs, too. */
+  /* 也备份挂起。*/
 
   if (in_place_resume && rmdir(fn)) {
 
@@ -590,7 +586,7 @@ static void maybe_delete_out_dir(void) {
 
 #endif /* ^!SIMPLE_FILES */
 
-    rename(fn, nfn); /* Ignore errors. */
+    rename(fn, nfn); /* 忽略错误。*/
     ck_free(nfn);
 
   }
@@ -598,7 +594,7 @@ static void maybe_delete_out_dir(void) {
   if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
   ck_free(fn);
 
-  /* And now, for some finishing touches. */
+  /* 现在，进行一些收尾工作。*/
 
   fn = alloc_printf("%s/.cur_input", out_dir);
   if (unlink(fn) && errno != ENOENT) goto dir_cleanup_failed;
@@ -620,7 +616,7 @@ static void maybe_delete_out_dir(void) {
 
   OKF("Output dir cleanup successful.");
 
-  /* Wow... is that all? If yes, celebrate! */
+  /* 哇……就这些吗？如果是，庆祝一下！*/
 
   return;
 
@@ -641,7 +637,7 @@ dir_cleanup_failed:
 
 
 
-/* Prepare output directories and fds. */
+/* 准备输出目录和文件描述符。*/
 
 void setup_dirs_fds(void) {
 
@@ -675,45 +671,43 @@ void setup_dirs_fds(void) {
 
   }
 
-  /* Queue directory for any starting & discovered paths. */
+  /* 用于任何起始和发现的路径的队列目录。*/
 
   tmp = alloc_printf("%s/queue", out_dir);
   if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
   ck_free(tmp);
 
-  /* Top-level directory for queue metadata used for session
-     resume and related tasks. */
+  /* 用于会话恢复和相关任务的队列元数据的顶级目录。*/
 
   tmp = alloc_printf("%s/queue/.state/", out_dir);
   if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
   ck_free(tmp);
 
-  /* Directory for flagging queue entries that went through
-     deterministic fuzzing in the past. */
+  /* 用于标记过去经过确定性模糊测试的队列条目的目录。*/
 
   tmp = alloc_printf("%s/queue/.state/deterministic_done/", out_dir);
   if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
   ck_free(tmp);
 
-  /* Directory with the auto-selected dictionary entries. */
+  /* 包含自动选择的字典条目的目录。*/
 
   tmp = alloc_printf("%s/queue/.state/auto_extras/", out_dir);
   if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
   ck_free(tmp);
 
-  /* The set of paths currently deemed redundant. */
+  /* 当前被视为冗余的路径集。*/
 
   tmp = alloc_printf("%s/queue/.state/redundant_edges/", out_dir);
   if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
   ck_free(tmp);
 
-  /* The set of paths showing variable behavior. */
+  /* 显示可变行为的路径集。*/
 
   tmp = alloc_printf("%s/queue/.state/variable_behavior/", out_dir);
   if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
   ck_free(tmp);
 
-  /* Sync directory for keeping track of cooperating fuzzers. */
+  /* 用于跟踪协作模糊器的同步目录。*/
 
   if (sync_id) {
 
@@ -726,19 +720,19 @@ void setup_dirs_fds(void) {
 
   }
 
-  /* All recorded crashes. */
+  /* 所有记录的崩溃。*/
 
   tmp = alloc_printf("%s/crashes", out_dir);
   if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
   ck_free(tmp);
 
-  /* All recorded hangs. */
+  /* 所有记录的挂起。*/
 
   tmp = alloc_printf("%s/hangs", out_dir);
   if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
   ck_free(tmp);
 
-  /* Generally useful file descriptors. */
+  /* 通常有用的文件描述符。*/
 
   dev_null_fd = open("/dev/null", O_RDWR);
   if (dev_null_fd < 0) PFATAL("Unable to open /dev/null");
@@ -746,7 +740,7 @@ void setup_dirs_fds(void) {
   dev_urandom_fd = open("/dev/urandom", O_RDONLY);
   if (dev_urandom_fd < 0) PFATAL("Unable to open /dev/urandom");
 
-  /* Gnuplot output file. */
+  /* Gnuplot 输出文件。*/
 
   tmp = alloc_printf("%s/plot_data", out_dir);
   fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL, 0600);
@@ -759,19 +753,19 @@ void setup_dirs_fds(void) {
   fprintf(plot_file, "# unix_time, cycles_done, cur_path, paths_total, "
                      "pending_total, pending_favs, map_size, unique_crashes, "
                      "unique_hangs, max_depth, execs_per_sec\n");
-                     /* ignore errors */
+                     /* 忽略错误 */
 
 }
 
 
 
-/* Setup the output file for fuzzed data, if not using -f. */
+/* 如果不使用 -f，则设置用于模糊测试数据的输出文件。*/
 
 void setup_stdio_file(void) {
 
   u8* fn = alloc_printf("%s/.cur_input", out_dir);
 
-  unlink(fn); /* Ignore errors */
+  unlink(fn); /* 忽略错误 */
 
   out_fd = open(fn, O_RDWR | O_CREAT | O_EXCL, 0600);
 
@@ -783,8 +777,8 @@ void setup_stdio_file(void) {
 
 #ifndef SIMPLE_FILES
 
-/* Construct a file name for a new test case, capturing the operation
-   that led to its discovery. Uses a static buffer. */
+/* 为新测试用例构造文件名，捕获导致其发现的操作。
+   使用静态缓冲区。*/
 
 u8* describe_op(u8 hnb) {
 

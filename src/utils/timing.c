@@ -1,9 +1,8 @@
 
 #include "timing.h"
 
-/* Describe integer. Uses 12 cyclic static buffers for return values. The value
-   returned should be five characters or less for all the integers we reasonably
-   expect to see. */
+/* 描述整数。使用 12 个循环静态缓冲区作为返回值。对于我们合理
+   期望看到的所有整数，返回的值应为五个或更少的字符。*/
 
 u8* DI(u64 val) {
 
@@ -58,8 +57,8 @@ u8* DI(u64 val) {
 
 }
 
-/* Describe float. Similar to the above, except with a single 
-   static buffer. */
+/* 描述浮点数。与上面类似，只是使用单个
+   静态缓冲区。*/
 
 u8* DF(double val) {
 
@@ -80,7 +79,7 @@ u8* DF(double val) {
 }
 
 
-/* Describe integer as memory size. */
+/* 将整数描述为内存大小。*/
 
 u8* DMS(u64 val) {
 
@@ -131,7 +130,7 @@ u8* DMS(u64 val) {
 }
 
 
-/* Describe time delta. Returns one static buffer, 34 chars of less. */
+/* 描述时间增量。返回一个静态缓冲区，长度为 34 个或更少的字符。*/
 
 u8* DTD(u64 cur_ms, u64 event_ms) {
 
@@ -155,7 +154,7 @@ u8* DTD(u64 cur_ms, u64 event_ms) {
 
 
 
-/* Get unix time in milliseconds */
+/* 获取 unix 时间（毫秒）*/
 
 u64 get_cur_time(void) {
 
@@ -169,7 +168,7 @@ u64 get_cur_time(void) {
 }
 
 
-/* Get unix time in microseconds */
+/* 获取 unix 时间（微秒）*/
 
 u64 get_cur_time_us(void) {
 

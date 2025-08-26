@@ -13,13 +13,13 @@ extern volatile u8 child_timed_out;
 extern FILE* plot_file;
 
 
-/* Spin up fork server (instrumented mode only). The idea is explained here:
+/* 启动 fork 服务器（仅限插桩模式）。其思想在此处解释：
 
    http://lcamtuf.blogspot.com/2014/10/fuzzing-binaries-without-execve.html
 
-   In essence, the instrumentation allows us to skip execve(), and just keep
-   cloning a stopped child. So, we just execute once, and then send commands
-   through a pipe. The other part of this logic is in afl-as.h. */
+   从本质上讲，插桩允许我们跳过 execve()，而只是不断地
+   克隆一个已停止的子进程。因此，我们只执行一次，然后通过
+   管道发送命令。此逻辑的另一部分在 afl-as.h 中。*/
 
 void init_forkserver(char** argv) {
 
@@ -40,13 +40,13 @@ void init_forkserver(char** argv) {
 
     struct rlimit r;
 
-    /* Umpf. On OpenBSD, the default fd limit for root users is set to
-       soft 128. Let's try to fix that... */
+    /* 唉。在 OpenBSD 上，root 用户的默认 fd 限制设置为
+       软限制 128。我们来尝试修复它…… */
 
     if (!getrlimit(RLIMIT_NOFILE, &r) && r.rlim_cur < FORKSRV_FD + 2) {
 
       r.rlim_cur = FORKSRV_FD + 2;
-      setrlimit(RLIMIT_NOFILE, &r); /* Ignore errors */
+      setrlimit(RLIMIT_NOFILE, &r); /* 忽略错误 */
 
     }
 
@@ -56,30 +56,30 @@ void init_forkserver(char** argv) {
 
 #ifdef RLIMIT_AS
 
-      setrlimit(RLIMIT_AS, &r); /* Ignore errors */
+      setrlimit(RLIMIT_AS, &r); /* 忽略错误 */
 
 #else
 
-      /* This takes care of OpenBSD, which doesn't have RLIMIT_AS, but
-         according to reliable sources, RLIMIT_DATA covers anonymous
-         maps - so we should be getting good protection against OOM bugs. */
+      /* 这解决了 OpenBSD 的问题，它没有 RLIMIT_AS，但是
+         根据可靠来源，RLIMIT_DATA 涵盖了匿名
+         映射 - 因此我们应该能很好地防范 OOM 错误。*/
 
-      setrlimit(RLIMIT_DATA, &r); /* Ignore errors */
+      setrlimit(RLIMIT_DATA, &r); /* 忽略错误 */
 
 #endif /* ^RLIMIT_AS */
 
 
     }
 
-    /* Dumping cores is slow and can lead to anomalies if SIGKILL is delivered
-       before the dump is complete. */
+    /* 转储核心文件很慢，并且如果在转储完成前传递了 SIGKILL，
+       可能会导致异常。*/
 
     r.rlim_max = r.rlim_cur = 0;
 
-    setrlimit(RLIMIT_CORE, &r); /* Ignore errors */
+    setrlimit(RLIMIT_CORE, &r); /* 忽略错误 */
 
-    /* Isolate the process and configure standard descriptors. If out_file is
-       specified, stdin is /dev/null; otherwise, out_fd is cloned instead. */
+    /* 隔离进程并配置标准描述符。如果指定了 out_file，
+       则 stdin 为 /dev/null；否则，将克隆 out_fd。*/
 
     setsid();
 
@@ -97,7 +97,7 @@ void init_forkserver(char** argv) {
 
     }
 
-    /* Set up control and status pipes, close the unneeded original fds. */
+    /* 设置控制和状态管道，关闭不需要的原始 fds。*/
 
     if (dup2(ctl_pipe[0], FORKSRV_FD) < 0) PFATAL("dup2() failed");
     if (dup2(st_pipe[1], FORKSRV_FD + 1) < 0) PFATAL("dup2() failed");
@@ -112,20 +112,20 @@ void init_forkserver(char** argv) {
     close(dev_urandom_fd);
     close(fileno(plot_file));
 
-    /* This should improve performance a bit, since it stops the linker from
-       doing extra work post-fork(). */
+    /* 这应该能稍微提高性能，因为它阻止了链接器在
+       fork() 后做额外的工作。*/
 
     if (!getenv("LD_BIND_LAZY")) setenv("LD_BIND_NOW", "1", 0);
 
-    /* Set sane defaults for ASAN if nothing else specified. */
+    /* 如果没有指定其他内容，则为 ASAN 设置合理的默认值。*/
 
     setenv("ASAN_OPTIONS", "abort_on_error=1:"
                            "detect_leaks=0:"
                            "symbolize=0:"
                            "allocator_may_return_null=1", 0);
 
-    /* MSAN is tricky, because it doesn't support abort_on_error=1 at this
-       point. So, we do this in a very hacky way. */
+    /* MSAN 很棘手，因为它目前不支持 abort_on_error=1。
+       所以，我们用一种非常 hack 的方式来做。*/
 
     setenv("MSAN_OPTIONS", "exit_code=" STRINGIFY(MSAN_ERROR) ":"
                            "symbolize=0:"
@@ -135,15 +135,15 @@ void init_forkserver(char** argv) {
 
     execv(target_path, argv);
 
-    /* Use a distinctive bitmap signature to tell the parent about execv()
-       falling through. */
+    /* 使用一个独特的位图签名来告诉父进程 execv()
+       失败了。*/
 
     *(u32*)trace_bits = EXEC_FAIL_SIG;
     exit(0);
 
   }
 
-  /* Close the unneeded endpoints. */
+  /* 关闭不需要的端点。*/
 
   close(ctl_pipe[0]);
   close(st_pipe[1]);
@@ -151,7 +151,7 @@ void init_forkserver(char** argv) {
   fsrv_ctl_fd = ctl_pipe[1];
   fsrv_st_fd  = st_pipe[0];
 
-  /* Wait for the fork server to come up, but don't wait too long. */
+  /* 等待 fork 服务器启动，但不要等太久。*/
 
   it.it_value.tv_sec = ((exec_tmout * FORK_WAIT_MULT) / 1000);
   it.it_value.tv_usec = ((exec_tmout * FORK_WAIT_MULT) % 1000) * 1000;
@@ -165,8 +165,8 @@ void init_forkserver(char** argv) {
 
   setitimer(ITIMER_REAL, &it, NULL);
 
-  /* If we have a four-byte "hello" message from the server, we're all set.
-     Otherwise, try to figure out what went wrong. */
+  /* 如果我们从服务器收到了一个四字节的“hello”消息，我们就准备好了。
+     否则，尝试找出问题所在。*/
 
   if (rlen == 4) {
     OKF("All right - fork server is up.");

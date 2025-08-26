@@ -4,8 +4,8 @@
 extern u32 rand_cnt;
 extern s32 dev_urandom_fd;
 
-/* Generate a random number (from 0 to limit - 1). This may
-   have slight bias. */
+/* 生成一个随机数（从 0 到 limit - 1）。这可能
+   有轻微的偏差。*/
 
 u32 UR(u32 limit) {
 
@@ -24,7 +24,7 @@ u32 UR(u32 limit) {
 
 }
 
-/* Shuffle an array of pointers. Might be slightly biased. */
+/* 打乱一个指针数组。可能略有偏差。*/
 
 void shuffle_ptrs(void** ptrs, u32 cnt) {
 

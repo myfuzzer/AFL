@@ -1,7 +1,7 @@
 #include "mutations.h"
 
-/* Helper to choose random block len for block operations in fuzz_one().
-   Doesn't return zero, provided that max_len is > 0. */
+/* 用于在 fuzz_one() 中为块操作选择随机块长度的辅助函数。
+   只要 max_len > 0，就不会返回零。*/
 
 u32 choose_block_len(u32 limit) {
 
@@ -44,9 +44,9 @@ u32 choose_block_len(u32 limit) {
 
 
 
-/* Calculate case desirability score to adjust the length of havoc fuzzing.
-   A helper function for fuzz_one(). Maybe some of these constants should
-   go into config.h. */
+/* 计算案例期望得分以调整 havoc 模糊测试的长度。
+   fuzz_one() 的辅助函数。也许其中一些常量应该
+   放入 config.h。*/
 
 u32 calculate_score(struct queue_entry* q) {
 
@@ -54,9 +54,9 @@ u32 calculate_score(struct queue_entry* q) {
   u32 avg_bitmap_size = total_bitmap_size / total_bitmap_entries;
   u32 perf_score = 100;
 
-  /* Adjust score based on execution speed of this path, compared to the
-     global average. Multiplier ranges from 0.1x to 3x. Fast inputs are
-     less expensive to fuzz, so we're giving them more air time. */
+  /* 根据此路径的执行速度与
+     全局平均值进行比较来调整分数。乘数范围为 0.1x 到 3x。快速输入
+     模糊测试成本较低，因此我们给它们更多的播出时间。*/
 
   if (q->exec_us * 0.1 > avg_exec_us) perf_score = 10;
   else if (q->exec_us * 0.25 > avg_exec_us) perf_score = 25;
@@ -66,8 +66,8 @@ u32 calculate_score(struct queue_entry* q) {
   else if (q->exec_us * 3 < avg_exec_us) perf_score = 200;
   else if (q->exec_us * 2 < avg_exec_us) perf_score = 150;
 
-  /* Adjust score based on bitmap size. The working theory is that better
-     coverage translates to better targets. Multiplier from 0.25x to 3x. */
+  /* 根据位图大小调整分数。工作理论是，更好的
+     覆盖率转化为更好的目标。乘数从 0.25x 到 3x。*/
 
   if (q->bitmap_size * 0.3 > avg_bitmap_size) perf_score *= 3;
   else if (q->bitmap_size * 0.5 > avg_bitmap_size) perf_score *= 2;
@@ -76,9 +76,9 @@ u32 calculate_score(struct queue_entry* q) {
   else if (q->bitmap_size * 2 < avg_bitmap_size) perf_score *= 0.5;
   else if (q->bitmap_size * 1.5 < avg_bitmap_size) perf_score *= 0.75;
 
-  /* Adjust score based on handicap. Handicap is proportional to how late
-     in the game we learned about this path. Latecomers are allowed to run
-     for a bit longer until they catch up with the rest. */
+  /* 根据障碍调整分数。障碍与我们了解
+     此路径的时间成正比。后来者被允许运行
+     更长的时间，直到他们赶上其他人。*/
 
   if (q->handicap >= 4) {
 
@@ -92,9 +92,9 @@ u32 calculate_score(struct queue_entry* q) {
 
   }
 
-  /* Final adjustment based on input depth, under the assumption that fuzzing
-     deeper test cases is more likely to reveal stuff that can't be
-     discovered with traditional fuzzers. */
+  /* 基于输入深度的最终调整，假设模糊测试
+     更深的测试用例更有可能揭示传统模糊测试器无法
+     发现的东西。*/
 
   switch (q->depth) {
 
@@ -106,7 +106,7 @@ u32 calculate_score(struct queue_entry* q) {
 
   }
 
-  /* Make sure that we don't go over limit. */
+  /* 确保我们不超过限制。*/
 
   if (perf_score > HAVOC_MAX_MULT * 100) perf_score = HAVOC_MAX_MULT * 100;
 
@@ -116,12 +116,11 @@ u32 calculate_score(struct queue_entry* q) {
 
 
 
-/* Helper function to see if a particular change (xor_val = old ^ new) could
-   be a product of deterministic bit flips with the lengths and stepovers
-   attempted by afl-fuzz. This is used to avoid dupes in some of the
-   deterministic fuzzing operations that follow bit flips. We also
-   return 1 if xor_val is zero, which implies that the old and attempted new
-   values are identical and the exec would be a waste of time. */
+/* 辅助函数，用于查看特定更改 (xor_val = old ^ new) 是否可能
+   是 afl-fuzz 尝试的长度和步长的确定性位翻转的产物。
+   这用于避免在位翻转之后的一些确定性模糊测试操作中出现重复。
+   如果 xor_val 为零，我们还返回 1，这意味着旧值和尝试的新值
+   相同，执行将是浪费时间。*/
 
 u8 could_be_bitflip(u32 xor_val) {
 
@@ -129,16 +128,16 @@ u8 could_be_bitflip(u32 xor_val) {
 
   if (!xor_val) return 1;
 
-  /* Shift left until first bit set. */
+  /* 向左移位直到第一个位被设置。*/
 
   while (!(xor_val & 1)) { sh++; xor_val >>= 1; }
 
-  /* 1-, 2-, and 4-bit patterns are OK anywhere. */
+  /* 1、2 和 4 位模式在任何地方都可以。*/
 
   if (xor_val == 1 || xor_val == 3 || xor_val == 15) return 1;
 
-  /* 8-, 16-, and 32-bit patterns are OK only if shift factor is
-     divisible by 8, since that's the stepover for these ops. */
+  /* 8、16 和 32 位模式仅在移位因子
+     可被 8 整除时才有效，因为这是这些操作的步长。*/
 
   if (sh & 7) return 0;
 
@@ -150,8 +149,8 @@ u8 could_be_bitflip(u32 xor_val) {
 }
 
 
-/* Helper function to see if a particular value is reachable through
-   arithmetic operations. Used for similar purposes. */
+/* 辅助函数，用于查看特定值是否可以通过
+   算术运算达到。用于类似目的。*/
 
 u8 could_be_arith(u32 old_val, u32 new_val, u8 blen) {
 
@@ -159,7 +158,7 @@ u8 could_be_arith(u32 old_val, u32 new_val, u8 blen) {
 
   if (old_val == new_val) return 1;
 
-  /* See if one-byte adjustments to any byte could produce this result. */
+  /* 查看对任何字节的一字节调整是否可以产生此结果。*/
 
   for (i = 0; i < blen; i++) {
 
@@ -170,7 +169,7 @@ u8 could_be_arith(u32 old_val, u32 new_val, u8 blen) {
 
   }
 
-  /* If only one byte differs and the values are within range, return 1. */
+  /* 如果只有一个字节不同并且值在范围内，则返回 1。*/
 
   if (diffs == 1) {
 
@@ -181,7 +180,7 @@ u8 could_be_arith(u32 old_val, u32 new_val, u8 blen) {
 
   if (blen == 1) return 0;
 
-  /* See if two-byte adjustments to any byte would produce this result. */
+  /* 查看对任何字节的两字节调整是否会产生此结果。*/
 
   diffs = 0;
 
@@ -194,7 +193,7 @@ u8 could_be_arith(u32 old_val, u32 new_val, u8 blen) {
 
   }
 
-  /* If only one word differs and the values are within range, return 1. */
+  /* 如果只有一个字不同并且值在范围内，则返回 1。*/
 
   if (diffs == 1) {
 
@@ -208,7 +207,7 @@ u8 could_be_arith(u32 old_val, u32 new_val, u8 blen) {
 
   }
 
-  /* Finally, let's do the same thing for dwords. */
+  /* 最后，让我们对 dword 做同样的事情。*/
 
   if (blen == 4) {
 
@@ -229,11 +228,10 @@ u8 could_be_arith(u32 old_val, u32 new_val, u8 blen) {
 
 
 
-/* Last but not least, a similar helper to see if insertion of an 
-   interesting integer is redundant given the insertions done for
-   shorter blen. The last param (check_le) is set if the caller
-   already executed LE insertion for current blen and wants to see
-   if BE variant passed in new_val is unique. */
+/* 最后但并非最不重要的一点是，一个类似的辅助函数，用于查看插入一个
+   有趣的整数是否是多余的，因为已经为较短的 blen 完成了插入。
+   最后一个参数 (check_le) 在调用者已经为当前 blen 执行了 LE 插入
+   并希望查看传入 new_val 的 BE 变体是否唯一时设置。*/
 
 u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
@@ -241,8 +239,8 @@ u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
   if (old_val == new_val) return 1;
 
-  /* See if one-byte insertions from interesting_8 over old_val could
-     produce new_val. */
+  /* 查看从 interesting_8 在 old_val 上进行的一字节插入是否可以
+     产生 new_val。*/
 
   for (i = 0; i < blen; i++) {
 
@@ -257,12 +255,12 @@ u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
   }
 
-  /* Bail out unless we're also asked to examine two-byte LE insertions
-     as a preparation for BE attempts. */
+  /* 除非我们还被要求检查两字节 LE 插入
+     作为 BE 尝试的准备，否则在此处退出。*/
 
   if (blen == 2 && !check_le) return 0;
 
-  /* See if two-byte insertions over old_val could give us new_val. */
+  /* 查看在 old_val 上进行的两字节插入是否可以给我们 new_val。*/
 
   for (i = 0; i < blen - 1; i++) {
 
@@ -273,7 +271,7 @@ u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
       if (new_val == tval) return 1;
 
-      /* Continue here only if blen > 2. */
+      /* 仅当 blen > 2 时才在此处继续。*/
 
       if (blen > 2) {
 
@@ -290,8 +288,8 @@ u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
   if (blen == 4 && check_le) {
 
-    /* See if four-byte insertions could produce the same result
-       (LE only). */
+    /* 查看四字节插入是否可以产生相同的结果
+       （仅限 LE）。*/
 
     for (j = 0; j < sizeof(interesting_32) / 4; j++)
       if (new_val == (u32)interesting_32[j]) return 1;

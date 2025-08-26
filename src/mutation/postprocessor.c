@@ -1,7 +1,7 @@
 #include "mutations.h"
 #include <dlfcn.h>
 
-/* Load postprocessor, if available. */
+/* 加载后处理器（如果可用）。*/
 
 void setup_post(void) {
 
@@ -19,7 +19,7 @@ void setup_post(void) {
   post_handler = dlsym(dh, "afl_postprocess");
   if (!post_handler) FATAL("Symbol 'afl_postprocess' not found.");
 
-  /* Do a quick test. It's better to segfault now than later =) */
+  /* 做一个快速测试。现在段错误比以后好 =) */
 
   post_handler("hello", &tlen);
 

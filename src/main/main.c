@@ -13,7 +13,7 @@
 #include "../mutation/mutations.h"
 
 
-/* Display usage hints. */
+/* 显示用法提示。*/
 
 void usage(u8* argv0) {
 
@@ -55,7 +55,7 @@ void usage(u8* argv0) {
 
 
 
-/* Make a copy of the current command line. */
+/* 制作当前命令行的副本。*/
 
 void save_cmdline(u32 argc, char** argv) {
 
@@ -87,16 +87,14 @@ void save_cmdline(u32 argc, char** argv) {
 
 
 
-
-
-/* Rewrite argv for QEMU. */
+/* 为 QEMU 重写 argv。*/
 
 char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
 
   char** new_argv = ck_alloc(sizeof(char*) * (argc + 4));
   u8 *tmp, *cp, *rsl, *own_copy;
 
-  /* Workaround for a QEMU stability glitch. */
+  /* QEMU 稳定性小问题的解决方法。*/
 
   setenv("QEMU_LOG", "nochain", 1);
 
@@ -105,7 +103,7 @@ char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
   new_argv[2] = target_path;
   new_argv[1] = "--";
 
-  /* Now we need to actually find the QEMU binary to put in argv[0]. */
+  /* 现在我们需要实际找到要放入 argv[0] 的 QEMU 二进制文件。*/
 
   tmp = getenv("AFL_PATH");
 
@@ -165,10 +163,9 @@ char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
 
 
 
-
 #ifndef AFL_LIB
 
-/* Main entry point */
+/* 主入口点 */
 
 int main(int argc, char** argv) {
 
@@ -194,7 +191,7 @@ int main(int argc, char** argv) {
 
     switch (opt) {
 
-      case 'i': /* input dir */
+      case 'i': /* 输入目录 */
 
         if (in_dir) FATAL("Multiple -i options not supported");
         in_dir = optarg;
@@ -203,13 +200,13 @@ int main(int argc, char** argv) {
 
         break;
 
-      case 'o': /* output dir */
+      case 'o': /* 输出目录 */
 
         if (out_dir) FATAL("Multiple -o options not supported");
         out_dir = optarg;
         break;
 
-      case 'M': { /* master sync ID */
+      case 'M': { /* 主同步 ID */
 
           u8* c;
 
@@ -238,19 +235,19 @@ int main(int argc, char** argv) {
         sync_id = ck_strdup(optarg);
         break;
 
-      case 'f': /* target file */
+      case 'f': /* 目标文件 */
 
         if (out_file) FATAL("Multiple -f options not supported");
         out_file = optarg;
         break;
 
-      case 'x': /* dictionary */
+      case 'x': /* 字典 */
 
         if (extras_dir) FATAL("Multiple -x options not supported");
         extras_dir = optarg;
         break;
 
-      case 't': { /* timeout */
+      case 't': { /* 超时 */
 
           u8 suffix = 0;
 
@@ -267,7 +264,7 @@ int main(int argc, char** argv) {
 
       }
 
-      case 'm': { /* mem limit */
+      case 'm': { /* 内存限制 */
 
           u8 suffix = 'M';
 
@@ -304,7 +301,7 @@ int main(int argc, char** argv) {
 
         break;
       
-      case 'b': { /* bind CPU core */
+      case 'b': { /* 绑定 CPU 内核 */
 
           if (cpu_to_bind_given) FATAL("Multiple -b options not supported");
           cpu_to_bind_given = 1;
@@ -316,25 +313,25 @@ int main(int argc, char** argv) {
 
       }
 
-      case 'd': /* skip deterministic */
+      case 'd': /* 跳过确定性 */
 
         if (skip_deterministic) FATAL("Multiple -d options not supported");
         skip_deterministic = 1;
         use_splicing = 1;
         break;
 
-      case 'B': /* load bitmap */
+      case 'B': /* 加载位图 */
 
-        /* This is a secret undocumented option! It is useful if you find
-           an interesting test case during a normal fuzzing process, and want
-           to mutate it without rediscovering any of the test cases already
-           found during an earlier run.
+        /* 这是一个秘密的未记录选项！如果您在正常的模糊测试过程中发现
+           一个有趣的测试用例，并且想要在不重新发现任何
+           在早期运行中已经找到的测试用例的情况下对其进行变异，
+           那么它很有用。
 
-           To use this mode, you need to point -B to the fuzz_bitmap produced
-           by an earlier run for the exact same binary... and that's it.
+           要使用此模式，您需要将 -B 指向由早期运行为
+           完全相同的二进制文件生成的 fuzz_bitmap……就是这样。
 
-           I only used this once or twice to get variants of a particular
-           file, so I'm not making this an official setting. */
+           我只用过一两次来获取特定文件的变体，
+           所以我没有将其设为官方设置。*/
 
         if (in_bitmap) FATAL("Multiple -B options not supported");
 
@@ -342,26 +339,26 @@ int main(int argc, char** argv) {
         read_bitmap(in_bitmap);
         break;
 
-      case 'C': /* crash mode */
+      case 'C': /* 崩溃模式 */
 
         if (crash_mode) FATAL("Multiple -C options not supported");
         crash_mode = FAULT_CRASH;
         break;
 
-      case 'n': /* dumb mode */
+      case 'n': /* 哑模式 */
 
         if (dumb_mode) FATAL("Multiple -n options not supported");
         if (getenv("AFL_DUMB_FORKSRV")) dumb_mode = 2; else dumb_mode = 1;
 
         break;
 
-      case 'T': /* banner */
+      case 'T': /* 横幅 */
 
         if (use_banner) FATAL("Multiple -T options not supported");
         use_banner = optarg;
         break;
 
-      case 'Q': /* QEMU mode */
+      case 'Q': /* QEMU 模式 */
 
         if (qemu_mode) FATAL("Multiple -Q options not supported");
         qemu_mode = 1;
@@ -370,9 +367,9 @@ int main(int argc, char** argv) {
 
         break;
 
-      case 'V': /* Show version number */
+      case 'V': /* 显示版本号 */
 
-        /* Version number has been printed already, just quit. */
+        /* 版本号已经打印过了，直接退出。*/
         exit(0);
 
       default:
@@ -475,7 +472,7 @@ int main(int argc, char** argv) {
 
   if (stop_soon) goto stop_fuzzing;
 
-  /* Woop woop woop */
+  /* 呜呜呜 */
 
   if (!not_on_tty) {
     sleep(4);
@@ -509,8 +506,8 @@ int main(int argc, char** argv) {
         fflush(stdout);
       }
 
-      /* If we had a full queue cycle with no new finds, try
-         recombination strategies next. */
+      /* 如果我们有一个完整的队列周期而没有新的发现，
+         接下来尝试重组策略。*/
 
       if (queued_paths == prev_queued) {
 
@@ -545,13 +542,13 @@ int main(int argc, char** argv) {
 
   if (queue_cur) show_stats();
 
-  /* If we stopped programmatically, we kill the forkserver and the current runner. 
-     If we stopped manually, this is done by the signal handler. */
+  /* 如果我们是编程停止的，我们会杀死 forkserver 和当前的运行程序。
+     如果我们是手动停止的，这由信号处理程序完成。*/
   if (stop_soon == 2) {
       if (child_pid > 0) kill(child_pid, SIGKILL);
       if (forksrv_pid > 0) kill(forksrv_pid, SIGKILL);
   }
-  /* Now that we've killed the forkserver, we wait for it to be able to get rusage stats. */
+  /* 现在我们已经杀死了 forkserver，我们等待它以便能够获取 rusage 统计信息。*/
   if (waitpid(forksrv_pid, NULL, 0) <= 0) {
     WARNF("error waitpid\n");
   }
@@ -565,7 +562,7 @@ stop_fuzzing:
   SAYF(CURSOR_SHOW cLRD "\n\n+++ Testing aborted %s +++\n" cRST,
        stop_soon == 2 ? "programmatically" : "by user");
 
-  /* Running for more than 30 minutes but still doing first cycle? */
+  /* 运行超过 30 分钟但仍在进行第一个周期？*/
 
   if (queue_cycle == 1 && get_cur_time() - start_time > 30 * 60 * 1000) {
 

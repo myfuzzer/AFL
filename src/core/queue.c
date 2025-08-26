@@ -13,7 +13,7 @@ extern u64 last_path_time;
 extern u8 *out_dir;
 
 
-/* Append new test case to the queue. */
+/* 将新测试用例附加到队列中。*/
 
 void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
@@ -38,7 +38,7 @@ void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
   cycles_wo_finds = 0;
 
-  /* Set next_100 pointer for every 100th element (index 0, 100, etc) to allow faster iteration. */
+  /* 为每第 100 个元素（索引 0、100 等）设置 next_100 指针，以加快迭代速度。*/
   if ((queued_paths - 1) % 100 == 0 && queued_paths > 1) {
 
     q_prev100->next_100 = q;
@@ -52,7 +52,7 @@ void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
 
 
-/* Destroy the entire queue. */
+/* 销毁整个队列。*/
 
 void destroy_queue(void) {
 
@@ -71,9 +71,8 @@ void destroy_queue(void) {
 }
 
 
-/* Mark deterministic checks as done for a particular queue entry. We use the
-   .state file to avoid repeating deterministic fuzzing when resuming aborted
-   scans. */
+/* 将特定队列条目的确定性检查标记为已完成。我们使用
+   .state 文件来避免在恢复中止的扫描时重复确定性模糊测试。*/
 
 void mark_as_det_done(struct queue_entry* q) {
 
@@ -93,8 +92,8 @@ void mark_as_det_done(struct queue_entry* q) {
 }
 
 
-/* Mark as variable. Create symlinks if possible to make it easier to examine
-   the files. */
+/* 标记为可变。如果可能，创建符号链接以便于检查
+   文件。*/
 
 void mark_as_variable(struct queue_entry* q) {
 
@@ -122,8 +121,8 @@ void mark_as_variable(struct queue_entry* q) {
 
 
 
-/* Mark / unmark as redundant (edge-only). This is not used for restoring state,
-   but may be useful for post-processing datasets. */
+/* 标记/取消标记为冗余（仅边）。这不用于恢复状态，
+   但可能对后处理数据集有用。*/
 
 void mark_as_redundant(struct queue_entry* q, u8 state) {
 
@@ -162,11 +161,10 @@ extern u8 score_changed, dumb_mode;
 
 
 
-/* The second part of the mechanism discussed above is a routine that
-   goes over top_rated[] entries, and then sequentially grabs winners for
-   previously-unseen bytes (temp_v) and marks them as favored, at least
-   until the next run. The favored entries are given more air time during
-   all fuzzing steps. */
+/* 上面讨论的机制的第二部分是一个例程，它
+   遍历 top_rated[] 条目，然后依次获取
+   先前未见过的字节 (temp_v) 的获胜者，并将它们标记为受青睐的，至少
+   在下一次运行之前是这样。在所有模糊测试步骤中，受青睐的条目会获得更多的播出时间。*/
 
 void cull_queue(void) {
 
@@ -190,15 +188,15 @@ void cull_queue(void) {
     q = q->next;
   }
 
-  /* Let's see if anything in the bitmap isn't captured in temp_v.
-     If yes, and if it has a top_rated[] contender, let's use it. */
+  /* 让我们看看位图中是否有任何东西没有被 temp_v 捕获。
+     如果是，并且它有一个 top_rated[] 竞争者，让我们使用它。*/
 
   for (i = 0; i < MAP_SIZE; i++)
     if (top_rated[i] && (temp_v[i >> 3] & (1 << (i & 7)))) {
 
       u32 j = MAP_SIZE >> 3;
 
-      /* Remove all bits belonging to the current entry from temp_v. */
+      /* 从 temp_v 中删除属于当前条目的所有位。*/
 
       while (j--) 
         if (top_rated[i]->trace_mini[j])
@@ -230,23 +228,22 @@ extern u8* trace_bits;
 
 
 
-/* When we bump into a new path, we call this to see if the path appears
-   more "favorable" than any of the existing ones. The purpose of the
-   "favorables" is to have a minimal set of paths that trigger all the bits
-   seen in the bitmap so far, and focus on fuzzing them at the expense of
-   the rest.
+/* 当我们遇到一条新路径时，我们会调用它来查看该路径是否出现
+   比任何现有路径都更“有利”。“有利”的目的是
+   拥有一组最小的路径，这些路径可以触发迄今为止在位图中看到的所有位，
+   并专注于对它们进行模糊测试，而牺牲其余的路径。
 
-   The first step of the process is to maintain a list of top_rated[] entries
-   for every byte in the bitmap. We win that slot if there is no previous
-   contender, or if the contender has a more favorable speed x size factor. */
+   该过程的第一步是为位图中的每个字节维护一个 top_rated[] 条目列表。
+   如果没有先前的竞争者，或者竞争者的速度 x 大小因子更有利，
+   我们就会赢得该位置。*/
 
 void update_bitmap_score(struct queue_entry* q) {
 
   u32 i;
   u64 fav_factor = q->exec_us * q->len;
 
-  /* For every byte set in trace_bits[], see if there is a previous winner,
-     and how it compares to us. */
+  /* 对于 trace_bits[] 中设置的每个字节，查看是否有先前的获胜者，
+     以及它与我们的比较情况。*/
 
   for (i = 0; i < MAP_SIZE; i++)
 
@@ -254,12 +251,12 @@ void update_bitmap_score(struct queue_entry* q) {
 
        if (top_rated[i]) {
 
-         /* Faster-executing or smaller test cases are favored. */
+         /* 执行速度更快或体积更小的测试用例更受青睐。*/
 
          if (fav_factor > top_rated[i]->exec_us * top_rated[i]->len) continue;
 
-         /* Looks like we're going to win. Decrease ref count for the
-            previous winner, discard its trace_bits[] if necessary. */
+         /* 看来我们要赢了。减少前一个获胜者的引用计数，
+            必要时丢弃其 trace_bits[]。*/
 
          if (!--top_rated[i]->tc_ref) {
            ck_free(top_rated[i]->trace_mini);
@@ -268,7 +265,7 @@ void update_bitmap_score(struct queue_entry* q) {
 
        }
 
-       /* Insert ourselves as the new winner. */
+       /* 将我们自己插入为新的获胜者。*/
 
        top_rated[i] = q;
        q->tc_ref++;
@@ -284,9 +281,9 @@ void update_bitmap_score(struct queue_entry* q) {
 
 }
 
-/* Check if the result of an execve() during routine fuzzing is interesting,
-   save or queue the input test case for further analysis if so. Returns 1 if
-   entry is saved, 0 otherwise. */
+/* 检查在常规模糊测试期间 execve() 的结果是否有趣，
+   如果是，则保存或排队输入测试用例以供进一步分析。如果
+   条目已保存，则返回 1，否则返回 0。*/
 
 u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
@@ -297,8 +294,8 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
   if (fault == crash_mode) {
 
-    /* Keep only if there are new bits in the map, add to queue for
-       future fuzzing, etc. */
+    /* 仅在映射中有新位时才保留，添加到队列中以备
+       将来的模糊测试等。*/
 
     if (!(hnb = has_new_bits(virgin_bits))) {
       if (crash_mode) total_crashes++;
@@ -325,8 +322,7 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
     queue_top->exec_cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
 
-    /* Try to calibrate inline; this also calls update_bitmap_score() when
-       successful. */
+    /* 尝试内联校准；这在成功时也会调用 update_bitmap_score()。*/
 
     res = calibrate_case(argv, queue_top, mem, queue_cycle - 1, 0);
 
@@ -346,10 +342,10 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
     case FAULT_TMOUT:
 
-      /* Timeouts are not very interesting, but we're still obliged to keep
-         a handful of samples. We use the presence of new bits in the
-         hang-specific bitmap as a signal of uniqueness. In "dumb" mode, we
-         just keep everything. */
+      /* 超时不是很有趣，但我们仍然有义务保留
+         少量样本。我们使用特定于挂起的位图中新位的存在
+         作为唯一性的信号。在“哑”模式下，我们
+         只保留所有内容。*/
 
       total_tmouts++;
 
@@ -369,9 +365,9 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
       unique_tmouts++;
 
-      /* Before saving, we make sure that it's a genuine hang by re-running
-         the target with a more generous timeout (unless the default timeout
-         is already generous). */
+      /* 在保存之前，我们通过使用更宽松的超时重新运行目标来确保
+         它是一个真正的挂起（除非默认超时
+         已经很宽松了）。*/
 
       if (exec_tmout < hang_tmout) {
 
@@ -379,9 +375,9 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
         write_to_testcase(mem, len);
         new_fault = run_target(argv, hang_tmout);
 
-        /* A corner case that one user reported bumping into: increasing the
-           timeout actually uncovers a crash. Make sure we don't discard it if
-           so. */
+        /* 一个用户报告遇到的极端情况：增加
+           超时实际上发现了一个崩溃。确保我们不会丢弃它，如果
+           是这样的话。*/
 
         if (!stop_soon && new_fault == FAULT_CRASH) goto keep_as_crash;
 
@@ -411,9 +407,9 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
 keep_as_crash:
 
-      /* This is handled in a manner roughly similar to timeouts,
-         except for slightly different limits and no need to re-run test
-         cases. */
+      /* 这以与超时大致相似的方式处理，
+         除了略有不同的限制和无需重新运行测试
+         用例。*/
 
       total_crashes++;
 
@@ -458,8 +454,8 @@ keep_as_crash:
 
   }
 
-  /* If we're here, we apparently want to save the crash or hang
-     test case, too. */
+  /* 如果我们在这里，我们显然也想保存崩溃或挂起的
+     测试用例。*/
 
   fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (fd < 0) PFATAL("Unable to create '%s'", fn);

@@ -8,9 +8,7 @@ extern u32 a_extras_cnt;
 
 
 
-
-
-/* Save automatically generated extras. */
+/* 保存自动生成的附加数据。*/
 
 void save_auto(void) {
 
@@ -38,7 +36,7 @@ void save_auto(void) {
 }
 
 
-/* Trim and possibly create a banner for the run. */
+/* 修剪并可能为运行创建一个横幅。*/
 
 void fix_up_banner(u8* name) {
 
@@ -67,7 +65,7 @@ void fix_up_banner(u8* name) {
 
 }
 
-/* Check if we're on TTY. */
+/* 检查我们是否在 TTY 上。*/
 
 void check_if_tty(void) {
 
@@ -94,8 +92,7 @@ void check_if_tty(void) {
 
 
 
-
-/* Check terminal dimensions after resize. */
+/* 调整大小后检查终端尺寸。*/
 
 void check_term_size(void) {
 
@@ -111,7 +108,7 @@ void check_term_size(void) {
 }
 
 
-/* Count the number of logical CPU cores. */
+/* 计算逻辑 CPU 内核的数量。*/
 
 void get_core_count(void) {
 
@@ -121,7 +118,7 @@ void get_core_count(void) {
 
   size_t s = sizeof(cpu_core_count);
 
-  /* On *BSD systems, we can just use a sysctl to get the number of CPUs. */
+  /* 在 *BSD 系统上，我们可以只使用一个 sysctl 来获取 CPU 的数量。*/
 
 #ifdef __APPLE__
 
@@ -164,7 +161,7 @@ void get_core_count(void) {
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 
-    /* Add ourselves, since the 1-minute average doesn't include that yet. */
+    /* 添加我们自己，因为 1 分钟的平均值还不包括它。*/
 
     cur_runnable++;
 
@@ -200,11 +197,10 @@ void get_core_count(void) {
 
 
 
-
 #ifdef HAVE_AFFINITY
 
-/* Build a list of processes bound to specific cores. Returns -1 if nothing
-   can be found. Assumes an upper bound of 4k CPUs. */
+/* 构建绑定到特定核心的进程列表。如果找不到任何东西，则返回 -1。
+   假设 CPU 上限为 4k。*/
 
 void bind_to_free_cpu(void) {
 
@@ -235,15 +231,15 @@ void bind_to_free_cpu(void) {
 
   ACTF("Checking CPU core loadout...");
 
-  /* Introduce some jitter, in case multiple AFL tasks are doing the same
-     thing at the same time... */
+  /* 引入一些抖动，以防多个 AFL 任务同时执行相同的
+     操作…… */
 
   usleep(R(1000) * 250);
 
-  /* Scan all /proc/<pid>/status entries, checking for Cpus_allowed_list.
-     Flag all processes bound to a specific CPU using cpu_used[]. This will
-     fail for some exotic binding setups, but is likely good enough in almost
-     all real-world use cases. */
+  /* 扫描所有 /proc/<pid>/status 条目，检查 Cpus_allowed_list。
+     使用 cpu_used[] 标记所有绑定到特定 CPU 的进程。这对于
+     某些奇特的绑定设置会失败，但在几乎所有现实世界的使用案例中
+     可能都足够好。*/
 
   while ((de = readdir(d))) {
 
@@ -265,7 +261,7 @@ void bind_to_free_cpu(void) {
 
       u32 hval;
 
-      /* Processes without VmSize are probably kernel tasks. */
+      /* 没有 VmSize 的进程可能是内核任务。*/
 
       if (!strncmp(tmp, "VmSize:\t", 8)) has_vmsize = 1;
 
@@ -330,7 +326,7 @@ void bind_to_free_cpu(void) {
 
 #endif /* HAVE_AFFINITY */
 
-/* Get the number of runnable processes, with some simple smoothing. */
+/* 获取可运行进程的数量，并进行一些简单的平滑处理。*/
 
 double get_runnable_processes(void) {
 
@@ -338,17 +334,17 @@ double get_runnable_processes(void) {
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 
-  /* I don't see any portable sysctl or so that would quickly give us the
-     number of runnable processes; the 1-minute load average can be a
-     semi-decent approximation, though. */
+  /* 我没有看到任何可移植的 sysctl 或类似的东西可以快速给我们
+     可运行进程的数量；不过，1 分钟的负载平均值可以是一个
+     半不错的近似值。*/
 
   if (getloadavg(&res, 1) != 1) return 0;
 
 #else
 
-  /* On Linux, /proc/stat is probably the best way; load averages are
-     computed in funny ways and sometimes don't reflect extremely short-lived
-     processes well. */
+  /* 在 Linux 上，/proc/stat 可能是最好的方法；负载平均值
+     以有趣的方式计算，有时不能很好地反映极短寿命的
+     进程。*/
 
   FILE* f = fopen("/proc/stat", "r");
   u8 tmp[1024];
@@ -384,8 +380,8 @@ double get_runnable_processes(void) {
 
 
 
-/* Find first power of two greater or equal to val (assuming val under
-   2^31). */
+/* 找到大于或等于 val 的第一个 2 的幂（假设 val 小于
+   2^31）。*/
 
 u32 next_p2(u32 val) {
 
@@ -393,13 +389,13 @@ u32 next_p2(u32 val) {
   while (val > ret) ret <<= 1;
   return ret;
 
-} 
+}
+ 
 
 
-
-/* Do a PATH search and find target binary to see that it exists and
-   isn't a shell script - a common and painful mistake. We also check for
-   a valid ELF header and for evidence of AFL instrumentation. */
+/* 进行 PATH 搜索并找到目标二进制文件，以查看它是否存在并且
+   不是 shell 脚本——这是一个常见且痛苦的错误。我们还检查
+   有效的 ELF 头和 AFL 插桩的证据。*/
 
 void check_binary(u8* fname) {
 
@@ -456,7 +452,7 @@ void check_binary(u8* fname) {
 
   if (getenv("AFL_SKIP_BIN_CHECK")) return;
 
-  /* Check for blatant user errors. */
+  /* 检查明显的用户错误。*/
 
   if ((!strncmp(target_path, "/tmp/", 5) && !strchr(target_path + 5, '/')) ||
       (!strncmp(target_path, "/var/tmp/", 9) && !strchr(target_path + 9, '/')))
@@ -481,7 +477,7 @@ void check_binary(u8* fname) {
 
          "    Another possible cause is that you are actually trying to use a shell\n" 
          "    wrapper around the fuzzed component. Invoking shell can slow down the\n" 
-         "    fuzzing process by a factor of 20x or more; it's best to write the wrapper\n"
+         "    fuzzing process by a factor of 20x or more; it's best to write the wrapper\n" 
          "    in a compiled language instead.\n");
 
     FATAL("Program '%s' is a shell script", target_path);
@@ -535,7 +531,7 @@ void check_binary(u8* fname) {
   if (memmem(f_data, f_len, "libasan.so", 10) ||
       memmem(f_data, f_len, "__msan_init", 11)) uses_asan = 1;
 
-  /* Detect persistent & deferred init signatures in the binary. */
+  /* 在二进制文件中检测持久和延迟初始化签名。*/
 
   if (memmem(f_data, f_len, PERSIST_SIG, strlen(PERSIST_SIG) + 1)) {
 
@@ -567,19 +563,29 @@ void check_binary(u8* fname) {
 
 
 
-/* Make sure that core dumps don't go to a program. */
+/* 确保核心转储不会进入程序。*/
 
 void check_crash_handling(void) {
 
 #ifdef __APPLE__
 
-  /* Yuck! There appears to be no simple C API to query for the state of 
-     loaded daemons on MacOS X, and I'm a bit hesitant to do something
-     more sophisticated, such as disabling crash reporting via Mach ports,
-     until I get a box to test the code. So, for now, we check for crash
-     reporting the awful way. */
+  /* 讨厌！似乎没有简单的 C API 可以在 MacOS X 上查询
+     加载的守护进程的状态，而且我有点犹豫是否要做一些
+     更复杂的事情，比如通过 Mach 端口禁用崩溃报告，
+     直到我有一台机器来测试代码。所以，目前，我们用
+     糟糕的方式检查崩溃报告。*/
   
-  if (system("launchctl list 2>/dev/null | grep -q '\\.ReportCrash$'")) return;
+  if (system("launchctl list 2>/dev/null | grep -q '\.ReportCrash
+
+
+
+
+
+
+
+
+
+ ")) return;
 
   SAYF("\n" cLRD "[-] " cRST
        "Whoops, your system is configured to forward crash notifications to an\n"
@@ -598,8 +604,8 @@ void check_crash_handling(void) {
 
 #else
 
-  /* This is Linux specific, but I don't think there's anything equivalent on
-     *BSD, so we can just let it slide for now. */
+  /* 这是特定于 Linux 的，但我不认为在
+     *BSD 上有任何等效的东西，所以我们现在可以暂时忽略它。*/
 
   s32 fd = open("/proc/sys/kernel/core_pattern", O_RDONLY);
   u8  fchar;
@@ -633,7 +639,7 @@ void check_crash_handling(void) {
 }
 
 
-/* Check CPU governor. */
+/* 检查 CPU 调速器。*/
 
 void check_cpu_governor(void) {
 
@@ -689,7 +695,7 @@ void check_cpu_governor(void) {
 }
 
 
-/* Check ASAN options. */
+/* 检查 ASAN 选项。*/
 
 void check_asan_opts(void) {
   u8* x = getenv("ASAN_OPTIONS");
@@ -721,7 +727,7 @@ void check_asan_opts(void) {
 
 
 
-/* Detect @@ in args. */
+/* 在参数中检测 @@。*/
 
 void detect_file_args(char** argv) {
 
@@ -738,17 +744,17 @@ void detect_file_args(char** argv) {
 
       u8 *aa_subst, *n_arg;
 
-      /* If we don't have a file name chosen yet, use a safe default. */
+      /* 如果我们还没有选择文件名，请使用安全的默认值。*/
 
       if (!out_file)
         out_file = alloc_printf("%s/.cur_input", out_dir);
 
-      /* Be sure that we're always using fully-qualified paths. */
+      /* 确保我们始终使用完全限定的路径。*/
 
       if (out_file[0] == '/') aa_subst = out_file;
       else aa_subst = alloc_printf("%s/%s", cwd, out_file);
 
-      /* Construct a replacement argv value. */
+      /* 构造一个替换的 argv 值。*/
 
       *aa_loc = 0;
       n_arg = alloc_printf("%s%s%s", argv[i], aa_subst, aa_loc + 2);
@@ -763,15 +769,15 @@ void detect_file_args(char** argv) {
 
   }
 
-  free(cwd); /* not tracked */
+  free(cwd); /* 未跟踪 */
 
 }
 
 
 
-/* Set up signal handlers. More complicated that needs to be, because libc on
-   Solaris doesn't resume interrupted reads(), sets SA_RESETHAND when you call
-   siginterrupt(), and does other unnecessary things. */
+/* 设置信号处理程序。比需要的更复杂，因为 libc on
+   Solaris 不会恢复中断的 reads()，设置 SA_RESETHAND 当你调用
+   siginterrupt() 时，并执行其他不必要的操作。*/
 
 void setup_signal_handlers(void) {
 
@@ -783,29 +789,29 @@ void setup_signal_handlers(void) {
 
   sigemptyset(&sa.sa_mask);
 
-  /* Various ways of saying "stop". */
+  /* 各种表示“停止”的方式。*/
 
   sa.sa_handler = handle_stop_sig;
   sigaction(SIGHUP, &sa, NULL);
   sigaction(SIGINT, &sa, NULL);
   sigaction(SIGTERM, &sa, NULL);
 
-  /* Exec timeout notifications. */
+  /* 执行超时通知。*/
 
   sa.sa_handler = handle_timeout;
   sigaction(SIGALRM, &sa, NULL);
 
-  /* Window resize */
+  /* 窗口大小调整 */
 
   sa.sa_handler = handle_resize;
   sigaction(SIGWINCH, &sa, NULL);
 
-  /* SIGUSR1: skip entry */
+  /* SIGUSR1：跳过条目 */
 
   sa.sa_handler = handle_skipreq;
   sigaction(SIGUSR1, &sa, NULL);
 
-  /* Things we don't care about. */
+  /* 我们不关心的事情。*/
 
   sa.sa_handler = SIG_IGN;
   sigaction(SIGTSTP, &sa, NULL);
@@ -815,7 +821,7 @@ void setup_signal_handlers(void) {
 
 
 
-/* Handle stop signal (Ctrl-C, etc). */
+/* 处理停止信号（Ctrl-C 等）。*/
 
 void handle_stop_sig(int sig) {
 
@@ -827,7 +833,7 @@ void handle_stop_sig(int sig) {
 }
 
 
-/* Handle skip request (SIGUSR1). */
+/* 处理跳过请求 (SIGUSR1)。*/
 
 void handle_skipreq(int sig) {
 
@@ -835,7 +841,7 @@ void handle_skipreq(int sig) {
 
 }
 
-/* Handle timeout (SIGALRM). */
+/* 处理超时 (SIGALRM)。*/
 
 void handle_timeout(int sig) {
 
@@ -854,7 +860,7 @@ void handle_timeout(int sig) {
 }
 
 
-/* Handle screen resize (SIGWINCH). */
+/* 处理屏幕大小调整 (SIGWINCH)。*/
 
 void handle_resize(int sig) {
   clear_screen = 1;

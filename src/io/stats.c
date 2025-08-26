@@ -27,7 +27,7 @@ void write_bitmap(void);
 
 
 
-/* Update stats file for unattended monitoring. */
+/* 更新统计文件以进行无人值守监控。*/
 
 void write_stats_file(double bitmap_cvg, double stability, double eps) {
 
@@ -48,8 +48,8 @@ void write_stats_file(double bitmap_cvg, double stability, double eps) {
 
   if (!f) PFATAL("fdopen() failed");
 
-  /* Keep last values in case we're called from another context
-     where exec/sec stats and such are not readily available. */
+  /* 保留最后的值，以防我们从另一个上下文中调用，
+     其中 exec/sec 统计信息等不容易获得。*/
 
   if (!bitmap_cvg && !stability && !eps) {
     bitmap_cvg = last_bcvg;
@@ -72,7 +72,7 @@ void write_stats_file(double bitmap_cvg, double stability, double eps) {
              "paths_found       : %u\n"
              "paths_imported    : %u\n"
              "max_depth         : %u\n"
-             "cur_path          : %u\n" /* Must match find_start_position() */
+             "cur_path          : %u\n" /* 必须与 find_start_position() 匹配 */
              "pending_favs      : %u\n"
              "pending_total     : %u\n"
              "variable_paths    : %u\n"
@@ -84,7 +84,7 @@ void write_stats_file(double bitmap_cvg, double stability, double eps) {
              "last_crash        : %llu\n"
              "last_hang         : %llu\n"
              "execs_since_crash : %llu\n"
-             "exec_timeout      : %u\n" /* Must match find_timeout() */
+             "exec_timeout      : %u\n" /* 必须与 find_timeout() 匹配 */
              "afl_banner        : %s\n"
              "afl_version       : " VERSION "\n"
              "target_mode       : %s%s%s%s%s%s%s\n"
@@ -104,11 +104,10 @@ void write_stats_file(double bitmap_cvg, double stability, double eps) {
              (qemu_mode || dumb_mode || no_forkserver || crash_mode ||
               persistent_mode || deferred_mode) ? "" : "default",
              orig_cmdline, slowest_exec_ms);
-             /* ignore errors */
+             /* 忽略错误 */
 
-  /* Get rss value from the children
-     We must have killed the forkserver process and called waitpid
-     before calling getrusage */
+  /* 从子进程获取 rss 值
+     我们必须在调用 getrusage 之前杀死 forkserver 进程并调用 waitpid */
   if (getrusage(RUSAGE_CHILDREN, &usage)) {
       WARNF("getrusage failed");
   } else if (usage.ru_maxrss == 0) {
@@ -127,8 +126,10 @@ void write_stats_file(double bitmap_cvg, double stability, double eps) {
 
 
 
-/* A spiffy retro stats screen! This is called every stats_update_freq
-   execve() calls, plus in several other circumstances. */
+
+
+/* 一个漂亮的复古统计屏幕！这个函数在每 stats_update_freq 次
+   execve() 调用时被调用，以及在其他几种情况下。*/
 
 void show_stats(void) {
 
@@ -144,15 +145,15 @@ void show_stats(void) {
 
   cur_ms = get_cur_time();
 
-  /* If not enough time has passed since last UI update, bail out. */
+  /* 如果自上次 UI 更新以来没有足够的时间，则退出。*/
 
   if (cur_ms - last_ms < 1000 / UI_TARGET_HZ) return;
 
-  /* Check if we're past the 10 minute mark. */
+  /* 检查我们是否超过了 10 分钟。*/
 
   if (cur_ms - start_time > 10 * 60 * 1000) run_over10m = 1;
 
-  /* Calculate smoothed exec speed stats. */
+  /* 计算平滑的执行速度统计信息。*/
 
   if (!last_execs) {
   
@@ -163,8 +164,7 @@ void show_stats(void) {
     double cur_avg = ((double)(total_execs - last_execs)) * 1000 /
                      (cur_ms - last_ms);
 
-    /* If there is a dramatic (5x+) jump in speed, reset the indicator
-       more quickly. */
+    /* 如果速度出现急剧（5倍+）的跃升，则更快地重置指示器。*/
 
     if (cur_avg * 5 < avg_exec || cur_avg / 5 > avg_exec)
       avg_exec = cur_avg;
@@ -177,12 +177,12 @@ void show_stats(void) {
   last_ms = cur_ms;
   last_execs = total_execs;
 
-  /* Tell the callers when to contact us (as measured in execs). */
+  /* 告诉调用者何时与我们联系（以 execs 为单位）。*/
 
   stats_update_freq = avg_exec / (UI_TARGET_HZ * 10);
   if (!stats_update_freq) stats_update_freq = 1;
 
-  /* Do some bitmap stats. */
+  /* 做一些位图统计。*/
 
   t_bytes = count_non_255_bytes(virgin_bits);
   t_byte_ratio = ((double)t_bytes * 100) / MAP_SIZE;
@@ -192,7 +192,7 @@ void show_stats(void) {
   else
     stab_ratio = 100;
 
-  /* Roughly every minute, update fuzzer stats and save auto tokens. */
+  /* 大约每分钟，更新 fuzzer 统计信息并保存自动令牌。*/
 
   if (cur_ms - last_stats_ms > STATS_UPDATE_SEC * 1000) {
 
@@ -203,7 +203,7 @@ void show_stats(void) {
 
   }
 
-  /* Every now and then, write plot data. */
+  /* 每隔一段时间，写入绘图数据。*/
 
   if (cur_ms - last_plot_ms > PLOT_UPDATE_SEC * 1000) {
 
@@ -212,22 +212,22 @@ void show_stats(void) {
  
   }
 
-  /* Honor AFL_EXIT_WHEN_DONE and AFL_BENCH_UNTIL_CRASH. */
+  /* 遵守 AFL_EXIT_WHEN_DONE 和 AFL_BENCH_UNTIL_CRASH。*/
 
   if (!dumb_mode && cycles_wo_finds > 100 && !pending_not_fuzzed &&
       getenv("AFL_EXIT_WHEN_DONE")) stop_soon = 2;
 
   if (total_crashes && getenv("AFL_BENCH_UNTIL_CRASH")) stop_soon = 2;
 
-  /* If we're not on TTY, bail out. */
+  /* 如果我们不在 TTY 上，则退出。*/
 
   if (not_on_tty) return;
 
-  /* Compute some mildly useful bitmap stats. */
+  /* 计算一些稍微有用的位图统计信息。*/
 
   t_bits = (MAP_SIZE << 3) - count_bits(virgin_bits);
 
-  /* Now, for the visuals... */
+  /* 现在，来看视觉效果…… */
 
   if (clear_screen) {
 
@@ -249,7 +249,7 @@ void show_stats(void) {
 
   }
 
-  /* Let's start by drawing a centered banner. */
+  /* 让我们从绘制一个居中的横幅开始。*/
 
   banner_len = (crash_mode ? 24 : 22) + strlen(VERSION) + strlen(use_banner);
   banner_pad = (80 - banner_len) / 2;
@@ -261,7 +261,7 @@ void show_stats(void) {
 
   SAYF("\n%s\n\n", tmp);
 
-  /* "Handy" shortcuts for drawing boxes... */
+  /* 用于绘制框的“便捷”快捷方式…… */
 
 #define bSTG    bSTART cGRA
 #define bH2     bH bH
@@ -273,7 +273,7 @@ void show_stats(void) {
 #define SP10    SP5 SP5
 #define SP20    SP10 SP10
 
-  /* Lord, forgive me this. */
+  /* 主啊，原谅我这个。*/
 
   SAYF(SET_G1 bSTG bLT bH bSTOP cCYA " process timing " bSTG bH30 bH5 bH2 bHB
        bH bSTOP cCYA " overall results " bSTG bH5 bRT "\n");
@@ -286,17 +286,17 @@ void show_stats(void) {
 
     u64 min_wo_finds = (cur_ms - last_path_time) / 1000 / 60;
 
-    /* First queue cycle: don't stop now! */
+    /* 第一个队列周期：现在不要停止！*/
     if (queue_cycle == 1 || min_wo_finds < 15) strcpy(tmp, cMGN); else
 
-    /* Subsequent cycles, but we're still making finds. */
+    /* 后续周期，但我们仍在发现。*/
     if (cycles_wo_finds < 25 || min_wo_finds < 30) strcpy(tmp, cYEL); else
 
-    /* No finds for a long time and no test cases to try. */
+    /* 很长一段时间没有发现，也没有要尝试的测试用例。*/
     if (cycles_wo_finds > 100 && !pending_not_fuzzed && min_wo_finds > 120)
       strcpy(tmp, cLGN);
 
-    /* Default: cautiously OK to stop? */
+    /* 默认：谨慎地可以停止？*/
     else strcpy(tmp, cLBL);
 
   }
@@ -305,8 +305,8 @@ void show_stats(void) {
        "  cycles done : %s%-5s  " bSTG bV "\n",
        DTD(cur_ms, start_time), tmp, DI(queue_cycle - 1));
 
-  /* We want to warn people about not seeing new paths after a full cycle,
-     except when resuming fuzzing or running in non-instrumented mode. */
+  /* 我们希望在整个周期后没有看到新路径时警告人们，
+     除非在恢复模糊测试或在非插桩模式下运行时。*/
 
   if (!dumb_mode && (last_path_time || resuming_fuzz || queue_cycle == 1 ||
       in_bitmap || crash_mode)) {
@@ -331,8 +331,8 @@ void show_stats(void) {
   SAYF(bSTG bV bSTOP "  total paths : " cRST "%-5s  " bSTG bV "\n",
        DI(queued_paths));
 
-  /* Highlight crashes in red if found, denote going over the KEEP_UNIQUE_CRASH
-     limit with a '+' appended to the count. */
+  /* 如果发现崩溃，则以红色突出显示，并用附加到计数的“+”表示
+     超过 KEEP_UNIQUE_CRASH 限制。*/
 
   sprintf(tmp, "%s%s", DI(unique_crashes),
           (unique_crashes >= KEEP_UNIQUE_CRASH) ? "+" : "");
@@ -352,9 +352,9 @@ void show_stats(void) {
   SAYF(bVR bH bSTOP cCYA " cycle progress " bSTG bH20 bHB bH bSTOP cCYA
        " map coverage " bSTG bH bHT bH20 bH2 bH bVL "\n");
 
-  /* This gets funny because we want to print several variable-length variables
-     together, but then cram them into a fixed-width field - so we need to
-     put them in a temporary buffer first. */
+  /* 这变得很有趣，因为我们想一起打印几个可变长度的变量，
+     但然后将它们塞进一个固定宽度的字段中 - 所以我们需要
+     先将它们放入一个临时缓冲区。*/
 
   sprintf(tmp, "%s%s (%0.02f%%)", DI(current_entry),
           queue_cur->favored ? "" : "*",
@@ -384,7 +384,7 @@ void show_stats(void) {
   sprintf(tmp, "%s (%0.02f%%)", DI(queued_favored),
           ((double)queued_favored) * 100 / queued_paths);
 
-  /* Yeah... it's still going on... halp? */
+  /* 是的……它还在继续……救命？*/
 
   SAYF(bV bSTOP "  now trying : " cRST "%-21s " bSTG bV bSTOP 
        " favored paths : " cRST "%-22s " bSTG bV "\n", stage_name, tmp);
@@ -424,7 +424,7 @@ void show_stats(void) {
 
   }
 
-  /* Show a warning about slow execution. */
+  /* 显示关于执行缓慢的警告。*/
 
   if (avg_exec < 100) {
 
@@ -445,7 +445,7 @@ void show_stats(void) {
 
   SAYF (bSTG bV bSTOP "  total tmouts : " cRST "%-22s " bSTG bV "\n", tmp);
 
-  /* Aaaalmost there... hold on! */
+  /* 差不多了……坚持住！*/
 
   SAYF(bVR bH cCYA bSTOP " fuzzing strategy yields " bSTG bH10 bH bHT bH10
        bH5 bHB bH bSTOP cCYA " path geometry " bSTG bH5 bH2 bH bVL "\n");
@@ -550,7 +550,7 @@ void show_stats(void) {
   SAYF(bV bSTOP "        trim : " cRST "%-37s " bSTG bVR bH20 bH2 bH2 bRB "\n"
        bLB bH30 bH20 bH2 bH bRB bSTOP cRST RESET_G1, tmp);
 
-  /* Provide some CPU utilization stats. */
+  /* 提供一些 CPU 利用率统计信息。*/
 
   if (cpu_core_count) {
 
@@ -559,12 +559,12 @@ void show_stats(void) {
 
     u8* cpu_color = cCYA;
 
-    /* If we could still run one or more processes, use green. */
+    /* 如果我们仍然可以运行一个或多个进程，请使用绿色。*/
 
     if (cpu_core_count > 1 && cur_runnable + 1 <= cpu_core_count)
       cpu_color = cLGN;
 
-    /* If we're clearly oversubscribed, use red. */
+    /* 如果我们明显超额订阅，请使用红色。*/
 
     if (!no_cpu_meter_red && cur_utilization >= 150) cpu_color = cLRD;
 
@@ -592,7 +592,7 @@ void show_stats(void) {
 
   } else SAYF("\r");
 
-  /* Hallelujah! */
+  /* 哈利路亚！*/
 
   fflush(0);
 
@@ -604,16 +604,7 @@ void show_stats(void) {
 
 
 
-
-
-
-
-
-
-
-
-
-/* Update the plot file if there is a reason to. */
+/* 如果有理由，则更新绘图文件。*/
 
 void maybe_update_plot_file(double bitmap_cvg, double eps) {
 
@@ -634,7 +625,7 @@ void maybe_update_plot_file(double bitmap_cvg, double eps) {
   prev_uh  = unique_hangs;
   prev_md  = max_depth;
 
-  /* Fields in the file:
+  /* 文件中的字段：
 
      unix_time, cycles_done, cur_path, paths_total, paths_not_fuzzed,
      favored_not_fuzzed, unique_crashes, unique_hangs, max_depth,
@@ -644,7 +635,7 @@ void maybe_update_plot_file(double bitmap_cvg, double eps) {
           "%llu, %llu, %u, %u, %u, %u, %0.02f%%, %llu, %llu, %u, %0.02f\n",
           get_cur_time() / 1000, queue_cycle - 1, current_entry, queued_paths,
           pending_not_fuzzed, pending_favored, bitmap_cvg, unique_crashes,
-          unique_hangs, max_depth, eps); /* ignore errors */
+          unique_hangs, max_depth, eps); /* 忽略错误 */
 
   fflush(plot_file);
 
@@ -652,13 +643,14 @@ void maybe_update_plot_file(double bitmap_cvg, double eps) {
 
 
 
-/* The same, but for timeouts. The idea is that when resuming sessions without
-   -t given, we don't want to keep auto-scaling the timeout over and over
-   again to prevent it from growing due to random flukes. */
+
+/* 同样，但用于超时。这个想法是，在没有
+   给定 -t 的情况下恢复会话时，我们不希望不断地自动调整超时，
+   以防止它因随机侥幸而增长。*/
 
 void find_timeout(void) {
 
-  static u8 tmp[4096]; /* Ought to be enough for anybody. */
+  static u8 tmp[4096]; /* 对任何人来说都应该足够了。*/
 
   u8  *fn, *off;
   s32 fd, i;
@@ -674,7 +666,7 @@ void find_timeout(void) {
 
   if (fd < 0) return;
 
-  i = read(fd, tmp, sizeof(tmp) - 1); (void)i; /* Ignore errors */
+  i = read(fd, tmp, sizeof(tmp) - 1); (void)i; /* 忽略错误 */
   close(fd);
 
   off = strstr(tmp, "exec_timeout      : ");
@@ -690,9 +682,10 @@ void find_timeout(void) {
 
 
 
-/* Display quick statistics at the end of processing the input directory,
-   plus a bunch of warnings. Some calibration stuff also ended up here,
-   along with several hardcoded constants. Maybe clean up eventually. */
+
+/* 在处理输入目录结束时显示快速统计信息，
+   以及一堆警告。一些校准的东西也在这里结束了，
+   还有几个硬编码的常量。也许最终会清理一下。*/
 
 void show_init_stats(void) {
 
@@ -724,7 +717,7 @@ void show_init_stats(void) {
     WARNF(cLRD "The target binary is pretty slow! See %s/perf_tips.txt.",
           doc_path);
 
-  /* Let's keep things moving with slow binaries. */
+  /* 让我们用慢速二进制文件保持事情的进展。*/
 
   if (avg_us > 50000) havoc_div = 10;     /* 0-19 execs/sec   */
   else if (avg_us > 20000) havoc_div = 5; /* 20-49 execs/sec  */
@@ -760,12 +753,13 @@ void show_init_stats(void) {
 
   if (!timeout_given) {
 
-    /* Figure out the appropriate timeout. The basic idea is: 5x average or
-       1x max, rounded up to EXEC_TM_ROUND ms and capped at 1 second.
+    /* 找出合适的超时时间。基本思想是：平均值的 5 倍或
+       最大值的 1 倍，向上取整到 EXEC_TM_ROUND 毫秒，并以 1 秒为上限。
 
-       If the program is slow, the multiplier is lowered to 2x or 3x, because
-       random scheduler jitter is less likely to have any impact, and because
-       our patience is wearing thin =) */
+       如果程序很慢，乘数会降低到 2 倍或 3 倍，因为
+       随机调度器抖动不太可能产生任何影响，而且因为
+       我们的耐心正在耗尽 =)
+    */
 
     if (avg_us > 50000) exec_tmout = avg_us * 2 / 1000;
     else if (avg_us > 10000) exec_tmout = avg_us * 3 / 1000;
@@ -787,8 +781,8 @@ void show_init_stats(void) {
 
   }
 
-  /* In dumb mode, re-running every timing out test case with a generous time
-     limit is very expensive, so let's select a more conservative default. */
+  /* 在哑模式下，用一个宽松的时间限制重新运行每个超时的测试用例
+     是非常昂贵的，所以让我们选择一个更保守的默认值。*/
 
   if (dumb_mode && !getenv("AFL_HANG_TMOUT"))
     hang_tmout = MIN(EXEC_TIMEOUT, exec_tmout * 2 + 100);
