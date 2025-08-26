@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 变异算法模块
-   =================================
-
-   包含各种模糊测试变异策略的声明
-*/
 
 #ifndef AFL_MUTATIONS_H
 #define AFL_MUTATIONS_H

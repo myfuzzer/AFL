@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 随机数生成模块
-   ===================================
-
-   包含随机数生成相关函数声明
-*/
 
 #ifndef AFL_RANDOM_H
 #define AFL_RANDOM_H

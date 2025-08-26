@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 队列管理模块实现
-   ====================================
-
-   实现测试用例队列的管理功能
-*/
 
 #include "queue.h"
 #include "../utils/timing.h"

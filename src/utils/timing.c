@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 时间处理模块实现
-   =====================================
-
-   实现时间相关的工具函数
-*/
 
 #include "timing.h"
 
@@ -187,10 +181,3 @@ u64 get_cur_time_us(void) {
   return (tv.tv_sec * 1000000ULL) + tv.tv_usec;
 
 }
-
-
-
-
-/* 描述时间增量。返回一个静态缓冲区，34个字符或更少 */
-
-/* hash32 function is already defined in hash.h */

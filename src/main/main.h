@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 主程序模块
-   ===============================
-
-   包含主函数和命令行处理相关声明
-*/
 
 #ifndef AFL_MAIN_H
 #define AFL_MAIN_H

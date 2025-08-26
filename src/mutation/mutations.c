@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 变异算法模块实现
-   ===================================
-
-   实现各种模糊测试变异策略
-*/
 
 #include "mutations.h"
 #include "../utils/random.h"
@@ -28,7 +22,6 @@ extern u64 queue_cycle;
 extern u8 dumb_mode;
 extern s32 splicing_with;
 
-/* 效应器映射 - 跟踪哪些字节影响程序行为 */
 /* eff_map is defined in globals.c */
 
 
@@ -1950,11 +1943,6 @@ abandon_entry:
 
 }
 
-
-
-
-
-/* 校准测试用例 - 简化版本 */
 
 /* Load postprocessor, if available. */
 

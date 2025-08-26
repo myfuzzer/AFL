@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 分叉服务器模块实现
-   ====================================
-
-   实现分叉服务器功能，用于优化执行性能
-*/
 
 #include "forkserver.h"
 #include "../utils/timing.h"

@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 统计模块实现
-   ===============================
-
-   实现统计数据写入和显示功能
-*/
 
 #include "stats.h"
 #include "../utils/timing.h"
@@ -657,14 +651,6 @@ void maybe_update_plot_file(double bitmap_cvg, double eps) {
 }
 
 
-
-
-
-
-
-
-/* 一个漂亮的复古统计屏幕！这在每个stats_update_freq执行调用时被调用，
-   以及在其他几种情况下 */
 
 /* The same, but for timeouts. The idea is that when resuming sessions without
    -t given, we don't want to keep auto-scaling the timeout over and over

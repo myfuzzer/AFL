@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 同步和分布式模块
-   ====================================
-
-   包含分布式模糊测试同步功能的声明
-*/
 
 #ifndef AFL_SYNC_H
 #define AFL_SYNC_H

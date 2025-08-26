@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 位图操作模块
-   =================================
-
-   包含位图相关操作函数声明
-*/
 
 #ifndef AFL_BITMAP_H
 #define AFL_BITMAP_H

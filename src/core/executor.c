@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 执行器模块实现
-   ==================================
-
-   实现目标程序执行和监控功能
-*/
 
 #include "executor.h"
 #include "../utils/timing.h"

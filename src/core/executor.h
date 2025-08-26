@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 执行器模块
-   ===============================
-
-   包含程序执行和监控相关函数声明
-*/
 
 #ifndef AFL_EXECUTOR_H
 #define AFL_EXECUTOR_H

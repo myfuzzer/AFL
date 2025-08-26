@@ -14,13 +14,6 @@
   limitations under the License.
 */
 
-/*
-   american fuzzy lop - 全局变量和数据结构定义
-   ===============================================
-
-   包含所有全局变量声明和核心数据结构定义
-*/
-
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif

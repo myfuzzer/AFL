@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 同步和分布式模块实现
-   =========================================
-
-   实现分布式模糊测试的同步功能
-*/
 
 #include "sync.h"
 #include "../utils/timing.h"

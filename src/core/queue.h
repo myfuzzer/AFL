@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 队列管理模块
-   =================================
-
-   包含测试用例队列的管理函数声明
-*/
 
 #ifndef AFL_QUEUE_H
 #define AFL_QUEUE_H

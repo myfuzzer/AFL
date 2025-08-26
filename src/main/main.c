@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 主程序模块实现
-   ===================================
-
-   实现主函数和命令行处理
-*/
 
 #include "main.h"
 #include "../utils/timing.h"

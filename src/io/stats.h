@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 统计模块
-   ===========================
-
-   包含统计相关函数声明
-*/
 
 #ifndef AFL_STATS_H
 #define AFL_STATS_H

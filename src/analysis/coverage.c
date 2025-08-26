@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 覆盖分析模块实现
-   ==================================
-
-   实现覆盖分析相关功能
-*/
 
 #include "coverage.h"
 #include "bitmap.h"

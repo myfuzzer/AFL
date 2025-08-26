@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 文件操作模块实现
-   ==================================
-
-   实现文件相关操作函数
-*/
 
 #include "file_ops.h"
 #include "../utils/random.h"

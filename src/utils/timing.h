@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 时间处理模块
-   =================================
-
-   包含时间相关的工具函数声明
-*/
 
 #ifndef AFL_TIMING_H
 #define AFL_TIMING_H

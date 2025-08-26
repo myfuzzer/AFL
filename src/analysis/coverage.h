@@ -1,9 +1,3 @@
-/*
-   american fuzzy lop - 覆盖分析模块
-   =================================
-
-   包含覆盖分析相关函数声明
-*/
 
 #ifndef AFL_COVERAGE_H
 #define AFL_COVERAGE_H

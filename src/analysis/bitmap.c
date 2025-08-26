@@ -1,10 +1,3 @@
-/*
-   american fuzzy lop - 位图操作模块实现
-   ====================================
-
-   实现位图相关的操作函数
-*/
-
 #include "bitmap.h"
 
 extern u8* trace_bits;
