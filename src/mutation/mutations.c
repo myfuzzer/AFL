@@ -1014,7 +1014,7 @@ skip_arith:
   stage_name  = "interest 8/8";
   stage_short = "int8";
   stage_cur   = 0;
-  stage_max   = len * INTERESTING_8_LEN;
+  stage_max   = len * sizeof(interesting_8);
 
   stage_val_type = STAGE_VAL_LE;
 
@@ -1029,13 +1029,13 @@ skip_arith:
     /* Let's consult the effector map... */
 
     if (!eff_map[EFF_APOS(i)]) {
-      stage_max -= INTERESTING_8_LEN;
+      stage_max -= sizeof(interesting_8);
       continue;
     }
 
     stage_cur_byte = i;
 
-    for (j = 0; j < INTERESTING_8_LEN; j++) {
+    for (j = 0; j < sizeof(interesting_8); j++) {
 
       /* Skip if the value could be a product of bitflips or arithmetics. */
 
@@ -1069,7 +1069,7 @@ skip_arith:
   stage_name  = "interest 16/8";
   stage_short = "int16";
   stage_cur   = 0;
-  stage_max   = 2 * (len - 1) * (INTERESTING_16_LEN);
+  stage_max   = 2 * (len - 1) * (sizeof(interesting_16) >> 1);
 
   orig_hit_cnt = new_hit_cnt;
 
@@ -1080,13 +1080,13 @@ skip_arith:
     /* Let's consult the effector map... */
 
     if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) {
-      stage_max -= INTERESTING_16_LEN * sizeof(s16);
+      stage_max -= sizeof(interesting_16);
       continue;
     }
 
     stage_cur_byte = i;
 
-    for (j = 0; j < INTERESTING_16_LEN; j++) {
+    for (j = 0; j < sizeof(interesting_16) / 2; j++) {
 
       stage_cur_val = interesting_16[j];
 
@@ -1137,7 +1137,7 @@ skip_arith:
   stage_name  = "interest 32/8";
   stage_short = "int32";
   stage_cur   = 0;
-  stage_max   = 2 * (len - 3) * (INTERESTING_32_LEN);
+  stage_max   = 2 * (len - 3) * (sizeof(interesting_32) >> 2);
 
   orig_hit_cnt = new_hit_cnt;
 
@@ -1149,13 +1149,13 @@ skip_arith:
 
     if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
         !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) {
-      stage_max -= INTERESTING_32_LEN * sizeof(s32) >> 1;
+      stage_max -= sizeof(interesting_32) >> 1;
       continue;
     }
 
     stage_cur_byte = i;
 
-    for (j = 0; j < INTERESTING_32_LEN; j++) {
+    for (j = 0; j < sizeof(interesting_32) / 4; j++) {
 
       stage_cur_val = interesting_32[j];
 
@@ -1436,7 +1436,7 @@ havoc_stage:
 
           /* Set byte to interesting value. */
 
-          out_buf[UR(temp_len)] = interesting_8[UR(INTERESTING_8_LEN)];
+          out_buf[UR(temp_len)] = interesting_8[UR(sizeof(interesting_8))];
           break;
 
         case 2:
@@ -1448,12 +1448,12 @@ havoc_stage:
           if (UR(2)) {
 
             *(u16*)(out_buf + UR(temp_len - 1)) =
-              interesting_16[UR(INTERESTING_16_LEN)];
+              interesting_16[UR(sizeof(interesting_16) >> 1)];
 
           } else {
 
             *(u16*)(out_buf + UR(temp_len - 1)) = SWAP16(
-              interesting_16[UR(INTERESTING_16_LEN)]);
+              interesting_16[UR(sizeof(interesting_16) >> 1)]);
 
           }
 
@@ -1468,12 +1468,12 @@ havoc_stage:
           if (UR(2)) {
   
             *(u32*)(out_buf + UR(temp_len - 3)) =
-              interesting_32[UR(INTERESTING_32_LEN)];
+              interesting_32[UR(sizeof(interesting_32) >> 2)];
 
           } else {
 
             *(u32*)(out_buf + UR(temp_len - 3)) = SWAP32(
-              interesting_32[UR(INTERESTING_32_LEN)]);
+              interesting_32[UR(sizeof(interesting_32) >> 2)]);
 
           }
 
@@ -2261,7 +2261,7 @@ void maybe_add_auto(u8* mem, u32 len) {
 
   if (len == 2) {
 
-    i = INTERESTING_16_LEN;
+    i = sizeof(interesting_16) >> 1;
 
     while (i--) 
       if (*((u16*)mem) == interesting_16[i] ||
@@ -2271,7 +2271,7 @@ void maybe_add_auto(u8* mem, u32 len) {
 
   if (len == 4) {
 
-    i = INTERESTING_32_LEN;
+    i = sizeof(interesting_32) >> 2;
 
     while (i--) 
       if (*((u32*)mem) == interesting_32[i] ||
@@ -2426,7 +2426,7 @@ u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
   for (i = 0; i < blen; i++) {
 
-    for (j = 0; j < INTERESTING_8_LEN; j++) {
+    for (j = 0; j < sizeof(interesting_8); j++) {
 
       u32 tval = (old_val & ~(0xff << (i * 8))) |
                  (((u8)interesting_8[j]) << (i * 8));
@@ -2446,7 +2446,7 @@ u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
   for (i = 0; i < blen - 1; i++) {
 
-    for (j = 0; j < INTERESTING_16_LEN; j++) {
+    for (j = 0; j < sizeof(interesting_16) / 2; j++) {
 
       u32 tval = (old_val & ~(0xffff << (i * 8))) |
                  (((u16)interesting_16[j]) << (i * 8));
@@ -2473,7 +2473,7 @@ u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
     /* See if four-byte insertions could produce the same result
        (LE only). */
 
-    for (j = 0; j < INTERESTING_32_LEN; j++)
+    for (j = 0; j < sizeof(interesting_32) / 4; j++)
       if (new_val == (u32)interesting_32[j]) return 1;
 
   }

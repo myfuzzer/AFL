@@ -181,7 +181,7 @@ u32 a_extras_cnt;              /* 可用token总数 */
 u8* (*post_handler)(u8* buf, u32* len);
 
 /* 有趣的值 */
-s8 interesting_8[]  = { INTERESTING_8 };
+s8  interesting_8[]  = { INTERESTING_8 };
 s16 interesting_16[] = { INTERESTING_8, INTERESTING_16 };
 s32 interesting_32[] = { INTERESTING_8, INTERESTING_16, INTERESTING_32 };
 

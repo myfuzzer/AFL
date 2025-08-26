@@ -285,14 +285,10 @@ extern u32 a_extras_cnt;              /* 可用token总数 */
 /* 后处理处理程序 */
 extern u8* (*post_handler)(u8* buf, u32* len);
 
-/* 有趣的值及其大小 */
-#define INTERESTING_8_LEN    18   /* INTERESTING_8 array length */
-#define INTERESTING_16_LEN   38   /* INTERESTING_8 + INTERESTING_16 array length */  
-#define INTERESTING_32_LEN   48   /* INTERESTING_8 + INTERESTING_16 + INTERESTING_32 array length */
-
-extern s8  interesting_8[];
-extern s16 interesting_16[];
-extern s32 interesting_32[];
+/* 有趣的值 */
+extern s8  interesting_8[9];
+extern s16 interesting_16[9 + 10];
+extern s32 interesting_32[9 + 10 + 8];
 
 /* CPU核心计数和亲和性 */
 extern s32 cpu_core_count;            /* CPU核心计数 */
