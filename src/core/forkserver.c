@@ -8,8 +8,6 @@
 #include "forkserver.h"
 #include "../utils/timing.h"
 
-#define ASAN_MIN_MEM 50  /* ASAN 最小内存限制 (MB) */
-
 extern u8* trace_bits;
 extern u8* target_path;
 extern u32 exec_tmout;

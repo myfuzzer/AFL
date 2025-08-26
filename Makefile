@@ -73,7 +73,7 @@ afl-fuzz-origin: afl-fuzz.c $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) afl-fuzz.c -o $@ $(LDFLAGS)
 
 afl-fuzz-refactor: $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) src/core/globals.c src/core/queue.c src/core/executor.c src/core/forkserver.c src/utils/timing.c src/utils/random.c src/utils/memory.c src/utils/system.c src/analysis/bitmap.c src/analysis/coverage.c src/io/file_ops.c src/io/stats.c src/mutation/mutations.c src/sync/sync.c src/main/main.c -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) src/core/globals.c src/core/queue.c src/core/executor.c src/core/forkserver.c src/utils/timing.c src/utils/random.c src/utils/system.c src/analysis/bitmap.c src/analysis/coverage.c src/io/file_ops.c src/io/stats.c src/mutation/mutations.c src/sync/sync.c src/main/main.c -o $@ $(LDFLAGS)
 
 afl-showmap: afl-showmap.c $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
