@@ -12,5 +12,13 @@
 
 /* 系统工具函数 */
 void save_auto(void);
+void fix_up_banner(u8* name);
+void check_if_tty(void);
+void check_term_size(void);
+void get_core_count(void);
+
+#ifdef HAVE_AFFINITY
+void bind_to_free_cpu(void);
+#endif
 
 #endif /* AFL_SYSTEM_H */

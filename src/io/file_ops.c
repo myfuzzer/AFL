@@ -36,42 +36,120 @@ void link_or_copy(u8* old_path, u8* new_path) {
 
 }
 
-/* 为各种模糊测试操作选择一个合理的块长度。通常，这将是一个随机数
-   从1到HAVOC_BLK_LARGE，但偶尔，它可能会更大，最多HAVOC_BLK_XL */
+/* 将修改后的数据写入文件进行测试 */
+void write_to_testcase(void* mem, u32 len) {
 
-u32 choose_block_len(u32 limit) {
+  s32 fd = out_fd;
 
-  u32 min_value, max_value;
-  u32 rlim = MIN(limit, HAVOC_BLK_XL);
+  if (out_file) {
+    fd = open(out_file, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0) PFATAL("Unable to open '%s'", out_file);
+  } else lseek(fd, 0, SEEK_SET);
 
-  switch (UR(3)) {
+  ck_write(fd, mem, len, out_file);
 
-    case 0:  min_value = 1;
-             max_value = HAVOC_BLK_SMALL;
-             break;
+  if (!out_file) {
+    if (ftruncate(fd, len)) PFATAL("ftruncate() failed");
+    lseek(fd, 0, SEEK_SET);
+  } else close(fd);
+}
 
-    case 1:  min_value = HAVOC_BLK_SMALL;
-             max_value = HAVOC_BLK_MEDIUM;
-             break;
+/* 同上，但带有可调整的间隙。用于修剪 */
+void write_with_gap(void* mem, u32 len, u32 skip_at, u32 skip_len) {
 
-    default: 
+  s32 fd = out_fd;
+  u32 tail_len = len - skip_at - skip_len;
 
-             if (UR(10)) {
+  if (out_file) {
+    fd = open(out_file, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0) PFATAL("Unable to open '%s'", out_file);
+  } else lseek(fd, 0, SEEK_SET);
 
-               min_value = HAVOC_BLK_MEDIUM;
-               max_value = HAVOC_BLK_LARGE;
+  if (skip_at) ck_write(fd, mem, skip_at, out_file);
+  if (tail_len) ck_write(fd, (u8*)mem + skip_at + skip_len, tail_len, out_file);
 
-             } else {
+  if (!out_file) {
+    if (ftruncate(fd, len - skip_len)) PFATAL("ftruncate() failed");
+    lseek(fd, 0, SEEK_SET);
+  } else close(fd);
+}
 
-               min_value = HAVOC_BLK_LARGE;
-               max_value = HAVOC_BLK_XL;
+/* 读取输入目录中的所有测试用例，然后排队等待测试 */
+void read_testcases(void) {
 
-             }
+  struct dirent **nl;
+  s32 nl_cnt;
+  u32 i;
+  u8* fn;
+
+  /* 自动检测非目录的输入文件... */
+  fn = alloc_printf("%s/queue", in_dir);
+  if (access(fn, F_OK)) ck_free(fn);
+
+  ACTF("扫描 '%s'...", in_dir);
+
+  /* 我们在这里使用scandir() + alphasort()，而不是opendir/readdir，
+     因为这样我们可以获得确定性排序，这有助于在多个不同系统上的测试 */
+
+  nl_cnt = scandir(in_dir, &nl, NULL, alphasort);
+
+  if (nl_cnt < 0) {
+    if (errno == ENOENT || errno == ENOTDIR)
+      SAYF("\n" cLRD "[-] " cRST
+           "输入目录 '%s' 似乎不存在或不是有效目录。", in_dir);
+    PFATAL("Unable to open '%s'", in_dir);
+  }
+
+  if (shuffle_queue && nl_cnt > 1) {
+
+    ACTF("随机化队列...");
+    shuffle_ptrs((void**)nl, nl_cnt);
 
   }
 
-  if (min_value >= rlim) min_value = 1;
+  for (i = 0; i < nl_cnt; i++) {
 
-  return min_value + UR(MIN(max_value, rlim) - min_value + 1);
+    struct stat st;
+
+    u8* fn = alloc_printf("%s/%s", in_dir, nl[i]->d_name);
+    u8* dfn = alloc_printf("%s/.state/deterministic_done/%s", in_dir, nl[i]->d_name);
+
+    u8  passed_det = 0;
+
+    free(nl[i]); /* 不是通过ck_free分配的 */
+
+    if (lstat(fn, &st) || access(fn, R_OK))
+      PFATAL("Unable to access '%s'", fn);
+
+    /* 这也过滤掉目录，等等 */
+    if (!S_ISREG(st.st_mode) || !st.st_size || strstr(fn, "/README.txt")) {
+      ck_free(fn);
+      ck_free(dfn);
+      continue;
+    }
+
+    if (st.st_size > MAX_FILE) 
+      FATAL("Test case '%s' is too big (%s, limit is %s)", fn,
+            DMS(st.st_size), DMS(MAX_FILE));
+
+    /* 检查元数据以查看确定性步骤是否已完成。我们不想重复这些！*/
+    if (!access(dfn, F_OK)) passed_det = 1;
+    ck_free(dfn);
+
+    add_to_queue(fn, st.st_size, passed_det);
+  }
+
+  free(nl); /* 不是通过ck_free分配的 */
+
+  if (!queued_paths) {
+    SAYF("\n" cLRD "[-] " cRST
+         "看起来输入目录中没有有效的测试用例！");
+    FATAL("No usable test cases in '%s'", in_dir);
+  }
+
+  last_path_time = 0;
+  queued_at_start = queued_paths;
+
+  ACTF("共导入 %u 个测试用例。", queued_paths);
 
 }

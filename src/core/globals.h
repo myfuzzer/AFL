@@ -325,8 +325,30 @@ extern u8 var_bytes[MAP_SIZE];        /* 看起来可变的字节 */
 /* 共享内存ID */
 extern s32 shm_id;                    /* SHM区域的ID */
 
+/* 缺失的常量定义 */
+#ifndef MAX_AUTO_EXTRA
+#define MAX_AUTO_EXTRA      50
+#endif
+
+#ifndef USE_AUTO_EXTRAS  
+#define USE_AUTO_EXTRAS     50
+#endif
+
+#ifndef SYNC_INTERVAL
+#define SYNC_INTERVAL       5
+#endif
+
+/* 额外的全局变量 */
+extern u8  first_run;              /* 首次运行标志 */
+extern u32 ret_val;                /* 返回值 */
+
 /* 全局函数声明 */
 void init_globals(void);
 void cleanup_globals(void);
+
+/* 辅助函数声明 */
+void shuffle_ptrs(void** ptrs, u32 cnt);
+u32 hash32(const void* key, u32 len, u32 seed);
+s32 find_timeout(void);
 
 #endif /* AFL_GLOBALS_H */

@@ -20,4 +20,12 @@ u32 count_non_255_bytes(u8* mem);
 /* 计数类初始化 */
 void init_count_class16(void);
 
+/* 轨迹处理函数 */
+#ifdef WORD_SIZE_64
+void simplify_trace(u64* mem);
+#else
+void simplify_trace(u32* mem);
+#endif
+void classify_counts(u64* mem);
+
 #endif /* AFL_BITMAP_H */

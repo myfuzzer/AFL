@@ -27,6 +27,12 @@ static const u8 count_class_lookup8[256] = {
 
 static u16 count_class_lookup16[65536];
 
+/* 简化查找表（来自原始 afl-fuzz.c） */
+static const u8 simplify_lookup[256] = { 
+  [0]         = 1,
+  [1 ... 255] = 128
+};
+
 /* 将轨迹字节压缩到更小的位图中。我们实际上只是在这里删除计数信息。
    这只在偶尔调用，对于一些新路径 */
 void minimize_bits(u8* dst, u8* src) {
@@ -174,6 +180,93 @@ u32 count_non_255_bytes(u8* mem) {
   }
 
   return ret;
+}
+
+/* 简化轨迹，消除命中计数信息，使得只有碰撞字节。*/
+
+#ifdef WORD_SIZE_64
+
+void simplify_trace(u64* mem) {
+
+  u32 i = MAP_SIZE >> 3;
+
+  while (i--) {
+
+    /* Optimize for sparse bitmaps. */
+
+    if (unlikely(*mem)) {
+
+      u8* mem8 = (u8*)mem;
+
+      mem8[0] = simplify_lookup[mem8[0]];
+      mem8[1] = simplify_lookup[mem8[1]];
+      mem8[2] = simplify_lookup[mem8[2]];
+      mem8[3] = simplify_lookup[mem8[3]];
+      mem8[4] = simplify_lookup[mem8[4]];
+      mem8[5] = simplify_lookup[mem8[5]];
+      mem8[6] = simplify_lookup[mem8[6]];
+      mem8[7] = simplify_lookup[mem8[7]];
+
+    } else *mem = 0x0101010101010101ULL;
+
+    mem++;
+
+  }
+
+}
+
+#else
+
+void simplify_trace(u32* mem) {
+
+  u32 i = MAP_SIZE >> 2;
+
+  while (i--) {
+
+    /* Optimize for sparse bitmaps. */
+
+    if (unlikely(*mem)) {
+
+      u8* mem8 = (u8*)mem;
+
+      mem8[0] = simplify_lookup[mem8[0]];
+      mem8[1] = simplify_lookup[mem8[1]];
+      mem8[2] = simplify_lookup[mem8[2]];
+      mem8[3] = simplify_lookup[mem8[3]];
+
+    } else *mem = 0x01010101;
+
+    mem++;
+  }
+
+}
+
+#endif /* ^WORD_SIZE_64 */
+
+/* 对轨迹中的执行计数进行分类。这用作任何新获取轨迹的预处理步骤 */
+void classify_counts(u64* mem) {
+
+  u32 i = MAP_SIZE >> 3;
+
+  while (i--) {
+
+    /* Optimize for sparse bitmaps. */
+
+    if (unlikely(*mem)) {
+
+      u16* mem16 = (u16*)mem;
+
+      mem16[0] = count_class_lookup16[mem16[0]];
+      mem16[1] = count_class_lookup16[mem16[1]];
+      mem16[2] = count_class_lookup16[mem16[2]];
+      mem16[3] = count_class_lookup16[mem16[3]];
+
+    }
+
+    mem++;
+
+  }
+
 }
 
 /* 初始化计数类查找16 */
