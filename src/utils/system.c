@@ -336,6 +336,536 @@ static void bind_to_free_cpu(void) {
 
 #endif /* HAVE_AFFINITY */
 
+/* Get the number of runnable processes, with some simple smoothing. */
+
+static double get_runnable_processes(void) {
+
+  static double res;
+
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
+
+  /* I don't see any portable sysctl or so that would quickly give us the
+     number of runnable processes; the 1-minute load average can be a
+     semi-decent approximation, though. */
+
+  if (getloadavg(&res, 1) != 1) return 0;
+
+#else
+
+  /* On Linux, /proc/stat is probably the best way; load averages are
+     computed in funny ways and sometimes don't reflect extremely short-lived
+     processes well. */
+
+  FILE* f = fopen("/proc/stat", "r");
+  u8 tmp[1024];
+  u32 val = 0;
+
+  if (!f) return 0;
+
+  while (fgets(tmp, sizeof(tmp), f)) {
+
+    if (!strncmp(tmp, "procs_running ", 14) ||
+        !strncmp(tmp, "procs_blocked ", 14)) val += atoi(tmp + 14);
+
+  }
+ 
+  fclose(f);
+
+  if (!res) {
+
+    res = val;
+
+  } else {
+
+    res = res * (1.0 - 1.0 / AVG_SMOOTHING) +
+          ((double)val) * (1.0 / AVG_SMOOTHING);
+
+  }
+
+#endif /* ^(__APPLE__ || __FreeBSD__ || __OpenBSD__) */
+
+  return res;
+
+}
+
+
+
+/* Find first power of two greater or equal to val (assuming val under
+   2^31). */
+
+static u32 next_p2(u32 val) {
+
+  u32 ret = 1;
+  while (val > ret) ret <<= 1;
+  return ret;
+
+} 
+
+
+
+/* Do a PATH search and find target binary to see that it exists and
+   isn't a shell script - a common and painful mistake. We also check for
+   a valid ELF header and for evidence of AFL instrumentation. */
+
+EXP_ST void check_binary(u8* fname) {
+
+  u8* env_path = 0;
+  struct stat st;
+
+  s32 fd;
+  u8* f_data;
+  u32 f_len = 0;
+
+  ACTF("Validating target binary...");
+
+  if (strchr(fname, '/') || !(env_path = getenv("PATH"))) {
+
+    target_path = ck_strdup(fname);
+    if (stat(target_path, &st) || !S_ISREG(st.st_mode) ||
+        !(st.st_mode & 0111) || (f_len = st.st_size) < 4)
+      FATAL("Program '%s' not found or not executable", fname);
+
+  } else {
+
+    while (env_path) {
+
+      u8 *cur_elem, *delim = strchr(env_path, ':');
+
+      if (delim) {
+
+        cur_elem = ck_alloc(delim - env_path + 1);
+        memcpy(cur_elem, env_path, delim - env_path);
+        delim++;
+
+      } else cur_elem = ck_strdup(env_path);
+
+      env_path = delim;
+
+      if (cur_elem[0])
+        target_path = alloc_printf("%s/%s", cur_elem, fname);
+      else
+        target_path = ck_strdup(fname);
+
+      ck_free(cur_elem);
+
+      if (!stat(target_path, &st) && S_ISREG(st.st_mode) &&
+          (st.st_mode & 0111) && (f_len = st.st_size) >= 4) break;
+
+      ck_free(target_path);
+      target_path = 0;
+
+    }
+
+    if (!target_path) FATAL("Program '%s' not found or not executable", fname);
+
+  }
+
+  if (getenv("AFL_SKIP_BIN_CHECK")) return;
+
+  /* Check for blatant user errors. */
+
+  if ((!strncmp(target_path, "/tmp/", 5) && !strchr(target_path + 5, '/')) ||
+      (!strncmp(target_path, "/var/tmp/", 9) && !strchr(target_path + 9, '/')))
+     FATAL("Please don't keep binaries in /tmp or /var/tmp");
+
+  fd = open(target_path, O_RDONLY);
+
+  if (fd < 0) PFATAL("Unable to open '%s'", target_path);
+
+  f_data = mmap(0, f_len, PROT_READ, MAP_PRIVATE, fd, 0);
+
+  if (f_data == MAP_FAILED) PFATAL("Unable to mmap file '%s'", target_path);
+
+  close(fd);
+
+  if (f_data[0] == '#' && f_data[1] == '!') {
+
+    SAYF("\n" cLRD "[-] " cRST
+         "Oops, the target binary looks like a shell script. Some build systems will\n"
+         "    sometimes generate shell stubs for dynamically linked programs; try static\n"
+         "    library mode (./configure --disable-shared) if that's the case.\n\n"
+
+         "    Another possible cause is that you are actually trying to use a shell\n" 
+         "    wrapper around the fuzzed component. Invoking shell can slow down the\n" 
+         "    fuzzing process by a factor of 20x or more; it's best to write the wrapper\n"
+         "    in a compiled language instead.\n");
+
+    FATAL("Program '%s' is a shell script", target_path);
+
+  }
+
+#ifndef __APPLE__
+
+  if (f_data[0] != 0x7f || memcmp(f_data + 1, "ELF", 3))
+    FATAL("Program '%s' is not an ELF binary", target_path);
+
+#else
+
+  if (f_data[0] != 0xCF || f_data[1] != 0xFA || f_data[2] != 0xED)
+    FATAL("Program '%s' is not a 64-bit Mach-O binary", target_path);
+
+#endif /* ^!__APPLE__ */
+
+  if (!qemu_mode && !dumb_mode &&
+      !memmem(f_data, f_len, SHM_ENV_VAR, strlen(SHM_ENV_VAR) + 1)) {
+
+    SAYF("\n" cLRD "[-] " cRST
+         "Looks like the target binary is not instrumented! The fuzzer depends on\n"
+         "    compile-time instrumentation to isolate interesting test cases while\n"
+         "    mutating the input data. For more information, and for tips on how to\n"
+         "    instrument binaries, please see %s/README.\n\n"
+
+         "    When source code is not available, you may be able to leverage QEMU\n"
+         "    mode support. Consult the README for tips on how to enable this.\n"
+
+         "    (It is also possible to use afl-fuzz as a traditional, \"dumb\" fuzzer.\n"
+         "    For that, you can use the -n option - but expect much worse results.)\n",
+         doc_path);
+
+    FATAL("No instrumentation detected");
+
+  }
+
+  if (qemu_mode &&
+      memmem(f_data, f_len, SHM_ENV_VAR, strlen(SHM_ENV_VAR) + 1)) {
+
+    SAYF("\n" cLRD "[-] " cRST
+         "This program appears to be instrumented with afl-gcc, but is being run in\n"
+         "    QEMU mode (-Q). This is probably not what you want - this setup will be\n"
+         "    slow and offer no practical benefits.\n");
+
+    FATAL("Instrumentation found in -Q mode");
+
+  }
+
+  if (memmem(f_data, f_len, "libasan.so", 10) ||
+      memmem(f_data, f_len, "__msan_init", 11)) uses_asan = 1;
+
+  /* Detect persistent & deferred init signatures in the binary. */
+
+  if (memmem(f_data, f_len, PERSIST_SIG, strlen(PERSIST_SIG) + 1)) {
+
+    OKF(cPIN "Persistent mode binary detected.");
+    setenv(PERSIST_ENV_VAR, "1", 1);
+    persistent_mode = 1;
+
+  } else if (getenv("AFL_PERSISTENT")) {
+
+    WARNF("AFL_PERSISTENT is no longer supported and may misbehave!");
+
+  }
+
+  if (memmem(f_data, f_len, DEFER_SIG, strlen(DEFER_SIG) + 1)) {
+
+    OKF(cPIN "Deferred forkserver binary detected.");
+    setenv(DEFER_ENV_VAR, "1", 1);
+    deferred_mode = 1;
+
+  } else if (getenv("AFL_DEFER_FORKSRV")) {
+
+    WARNF("AFL_DEFER_FORKSRV is no longer supported and may misbehave!");
+
+  }
+
+  if (munmap(f_data, f_len)) PFATAL("unmap() failed");
+
+}
+
+
+
+/* Make sure that core dumps don't go to a program. */
+
+static void check_crash_handling(void) {
+
+#ifdef __APPLE__
+
+  /* Yuck! There appears to be no simple C API to query for the state of 
+     loaded daemons on MacOS X, and I'm a bit hesitant to do something
+     more sophisticated, such as disabling crash reporting via Mach ports,
+     until I get a box to test the code. So, for now, we check for crash
+     reporting the awful way. */
+  
+  if (system("launchctl list 2>/dev/null | grep -q '\\.ReportCrash$'")) return;
+
+  SAYF("\n" cLRD "[-] " cRST
+       "Whoops, your system is configured to forward crash notifications to an\n"
+       "    external crash reporting utility. This will cause issues due to the\n"
+       "    extended delay between the fuzzed binary malfunctioning and this fact\n"
+       "    being relayed to the fuzzer via the standard waitpid() API.\n\n"
+       "    To avoid having crashes misinterpreted as timeouts, please run the\n" 
+       "    following commands:\n\n"
+
+       "    SL=/System/Library; PL=com.apple.ReportCrash\n"
+       "    launchctl unload -w ${SL}/LaunchAgents/${PL}.plist\n"
+       "    sudo launchctl unload -w ${SL}/LaunchDaemons/${PL}.Root.plist\n");
+
+  if (!getenv("AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES"))
+    FATAL("Crash reporter detected");
+
+#else
+
+  /* This is Linux specific, but I don't think there's anything equivalent on
+     *BSD, so we can just let it slide for now. */
+
+  s32 fd = open("/proc/sys/kernel/core_pattern", O_RDONLY);
+  u8  fchar;
+
+  if (fd < 0) return;
+
+  ACTF("Checking core_pattern...");
+
+  if (read(fd, &fchar, 1) == 1 && fchar == '|') {
+
+    SAYF("\n" cLRD "[-] " cRST
+         "Hmm, your system is configured to send core dump notifications to an\n"
+         "    external utility. This will cause issues: there will be an extended delay\n"
+         "    between stumbling upon a crash and having this information relayed to the\n"
+         "    fuzzer via the standard waitpid() API.\n\n"
+
+         "    To avoid having crashes misinterpreted as timeouts, please log in as root\n" 
+         "    and temporarily modify /proc/sys/kernel/core_pattern, like so:\n\n"
+
+         "    echo core >/proc/sys/kernel/core_pattern\n");
+
+    if (!getenv("AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES"))
+      FATAL("Pipe at the beginning of 'core_pattern'");
+
+  }
+ 
+  close(fd);
+
+#endif /* ^__APPLE__ */
+
+}
+
+
+/* Check CPU governor. */
+
+static void check_cpu_governor(void) {
+
+  FILE* f;
+  u8 tmp[128];
+  u64 min = 0, max = 0;
+
+  if (getenv("AFL_SKIP_CPUFREQ")) return;
+
+  f = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", "r");
+  if (!f) return;
+
+  ACTF("Checking CPU scaling governor...");
+
+  if (!fgets(tmp, 128, f)) PFATAL("fgets() failed");
+
+  fclose(f);
+
+  if (!strncmp(tmp, "perf", 4)) return;
+
+  f = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq", "r");
+
+  if (f) {
+    if (fscanf(f, "%llu", &min) != 1) min = 0;
+    fclose(f);
+  }
+
+  f = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq", "r");
+
+  if (f) {
+    if (fscanf(f, "%llu", &max) != 1) max = 0;
+    fclose(f);
+  }
+
+  if (min == max) return;
+
+  SAYF("\n" cLRD "[-] " cRST
+       "Whoops, your system uses on-demand CPU frequency scaling, adjusted\n"
+       "    between %llu and %llu MHz. Unfortunately, the scaling algorithm in the\n"
+       "    kernel is imperfect and can miss the short-lived processes spawned by\n"
+       "    afl-fuzz. To keep things moving, run these commands as root:\n\n"
+
+       "    cd /sys/devices/system/cpu\n"
+       "    echo performance | tee cpu*/cpufreq/scaling_governor\n\n"
+
+       "    You can later go back to the original state by replacing 'performance' with\n"
+       "    'ondemand'. If you don't want to change the settings, set AFL_SKIP_CPUFREQ\n"
+       "    to make afl-fuzz skip this check - but expect some performance drop.\n",
+       min / 1024, max / 1024);
+
+  FATAL("Suboptimal CPU scaling governor");
+
+}
+
+
+/* Check ASAN options. */
+
+static void check_asan_opts(void) {
+  u8* x = getenv("ASAN_OPTIONS");
+
+  if (x) {
+
+    if (!strstr(x, "abort_on_error=1"))
+      FATAL("Custom ASAN_OPTIONS set without abort_on_error=1 - please fix!");
+
+    if (!strstr(x, "symbolize=0"))
+      FATAL("Custom ASAN_OPTIONS set without symbolize=0 - please fix!");
+
+  }
+
+  x = getenv("MSAN_OPTIONS");
+
+  if (x) {
+
+    if (!strstr(x, "exit_code=" STRINGIFY(MSAN_ERROR)))
+      FATAL("Custom MSAN_OPTIONS set without exit_code="
+            STRINGIFY(MSAN_ERROR) " - please fix!");
+
+    if (!strstr(x, "symbolize=0"))
+      FATAL("Custom MSAN_OPTIONS set without symbolize=0 - please fix!");
+
+  }
+
+} 
+
+
+
+/* Detect @@ in args. */
+
+EXP_ST void detect_file_args(char** argv) {
+
+  u32 i = 0;
+  u8* cwd = getcwd(NULL, 0);
+
+  if (!cwd) PFATAL("getcwd() failed");
+
+  while (argv[i]) {
+
+    u8* aa_loc = strstr(argv[i], "@@");
+
+    if (aa_loc) {
+
+      u8 *aa_subst, *n_arg;
+
+      /* If we don't have a file name chosen yet, use a safe default. */
+
+      if (!out_file)
+        out_file = alloc_printf("%s/.cur_input", out_dir);
+
+      /* Be sure that we're always using fully-qualified paths. */
+
+      if (out_file[0] == '/') aa_subst = out_file;
+      else aa_subst = alloc_printf("%s/%s", cwd, out_file);
+
+      /* Construct a replacement argv value. */
+
+      *aa_loc = 0;
+      n_arg = alloc_printf("%s%s%s", argv[i], aa_subst, aa_loc + 2);
+      argv[i] = n_arg;
+      *aa_loc = '@';
+
+      if (out_file[0] != '/') ck_free(aa_subst);
+
+    }
+
+    i++;
+
+  }
+
+  free(cwd); /* not tracked */
+
+}
+
+
+
+/* Set up signal handlers. More complicated that needs to be, because libc on
+   Solaris doesn't resume interrupted reads(), sets SA_RESETHAND when you call
+   siginterrupt(), and does other unnecessary things. */
+
+EXP_ST void setup_signal_handlers(void) {
+
+  struct sigaction sa;
+
+  sa.sa_handler   = NULL;
+  sa.sa_flags     = SA_RESTART;
+  sa.sa_sigaction = NULL;
+
+  sigemptyset(&sa.sa_mask);
+
+  /* Various ways of saying "stop". */
+
+  sa.sa_handler = handle_stop_sig;
+  sigaction(SIGHUP, &sa, NULL);
+  sigaction(SIGINT, &sa, NULL);
+  sigaction(SIGTERM, &sa, NULL);
+
+  /* Exec timeout notifications. */
+
+  sa.sa_handler = handle_timeout;
+  sigaction(SIGALRM, &sa, NULL);
+
+  /* Window resize */
+
+  sa.sa_handler = handle_resize;
+  sigaction(SIGWINCH, &sa, NULL);
+
+  /* SIGUSR1: skip entry */
+
+  sa.sa_handler = handle_skipreq;
+  sigaction(SIGUSR1, &sa, NULL);
+
+  /* Things we don't care about. */
+
+  sa.sa_handler = SIG_IGN;
+  sigaction(SIGTSTP, &sa, NULL);
+  sigaction(SIGPIPE, &sa, NULL);
+
+}
+
+
+
+/* Handle stop signal (Ctrl-C, etc). */
+
+static void handle_stop_sig(int sig) {
+
+  stop_soon = 1; 
+
+  if (child_pid > 0) kill(child_pid, SIGKILL);
+  if (forksrv_pid > 0) kill(forksrv_pid, SIGKILL);
+
+}
+
+
+/* Handle skip request (SIGUSR1). */
+
+static void handle_skipreq(int sig) {
+
+  skip_requested = 1;
+
+}
+
+/* Handle timeout (SIGALRM). */
+
+static void handle_timeout(int sig) {
+
+  if (child_pid > 0) {
+
+    child_timed_out = 1; 
+    kill(child_pid, SIGKILL);
+
+  } else if (child_pid == -1 && forksrv_pid > 0) {
+
+    child_timed_out = 1; 
+    kill(forksrv_pid, SIGKILL);
+
+  }
+
+}
+
+
+/* Handle screen resize (SIGWINCH). */
+
+static void handle_resize(int sig) {
+  clear_screen = 1;
+}
+
 
 
 

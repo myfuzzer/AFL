@@ -750,3 +750,150 @@ void show_stats(void) {
   /* 这里可以添加更多的UI显示逻辑 */
 
 }
+
+/* The same, but for timeouts. The idea is that when resuming sessions without
+   -t given, we don't want to keep auto-scaling the timeout over and over
+   again to prevent it from growing due to random flukes. */
+
+static void find_timeout(void) {
+
+  static u8 tmp[4096]; /* Ought to be enough for anybody. */
+
+  u8  *fn, *off;
+  s32 fd, i;
+  u32 ret;
+
+  if (!resuming_fuzz) return;
+
+  if (in_place_resume) fn = alloc_printf("%s/fuzzer_stats", out_dir);
+  else fn = alloc_printf("%s/../fuzzer_stats", in_dir);
+
+  fd = open(fn, O_RDONLY);
+  ck_free(fn);
+
+  if (fd < 0) return;
+
+  i = read(fd, tmp, sizeof(tmp) - 1); (void)i; /* Ignore errors */
+  close(fd);
+
+  off = strstr(tmp, "exec_timeout      : ");
+  if (!off) return;
+
+  ret = atoi(off + 20);
+  if (ret <= 4) return;
+
+  exec_tmout = ret;
+  timeout_given = 3;
+
+}
+
+
+
+/* Display quick statistics at the end of processing the input directory,
+   plus a bunch of warnings. Some calibration stuff also ended up here,
+   along with several hardcoded constants. Maybe clean up eventually. */
+
+static void show_init_stats(void) {
+
+  struct queue_entry* q = queue;
+  u32 min_bits = 0, max_bits = 0;
+  u64 min_us = 0, max_us = 0;
+  u64 avg_us = 0;
+  u32 max_len = 0;
+
+  if (total_cal_cycles) avg_us = total_cal_us / total_cal_cycles;
+
+  while (q) {
+
+    if (!min_us || q->exec_us < min_us) min_us = q->exec_us;
+    if (q->exec_us > max_us) max_us = q->exec_us;
+
+    if (!min_bits || q->bitmap_size < min_bits) min_bits = q->bitmap_size;
+    if (q->bitmap_size > max_bits) max_bits = q->bitmap_size;
+
+    if (q->len > max_len) max_len = q->len;
+
+    q = q->next;
+
+  }
+
+  SAYF("\n");
+
+  if (avg_us > (qemu_mode ? 50000 : 10000)) 
+    WARNF(cLRD "The target binary is pretty slow! See %s/perf_tips.txt.",
+          doc_path);
+
+  /* Let's keep things moving with slow binaries. */
+
+  if (avg_us > 50000) havoc_div = 10;     /* 0-19 execs/sec   */
+  else if (avg_us > 20000) havoc_div = 5; /* 20-49 execs/sec  */
+  else if (avg_us > 10000) havoc_div = 2; /* 50-100 execs/sec */
+
+  if (!resuming_fuzz) {
+
+    if (max_len > 50 * 1024)
+      WARNF(cLRD "Some test cases are huge (%s) - see %s/perf_tips.txt!",
+            DMS(max_len), doc_path);
+    else if (max_len > 10 * 1024)
+      WARNF("Some test cases are big (%s) - see %s/perf_tips.txt.",
+            DMS(max_len), doc_path);
+
+    if (useless_at_start && !in_bitmap)
+      WARNF(cLRD "Some test cases look useless. Consider using a smaller set.");
+
+    if (queued_paths > 100)
+      WARNF(cLRD "You probably have far too many input files! Consider trimming down.");
+    else if (queued_paths > 20)
+      WARNF("You have lots of input files; try starting small.");
+
+  }
+
+  OKF("Here are some useful stats:\n\n"
+
+      cGRA "    Test case count : " cRST "%u favored, %u variable, %u total\n"
+      cGRA "       Bitmap range : " cRST "%u to %u bits (average: %0.02f bits)\n"
+      cGRA "        Exec timing : " cRST "%s to %s us (average: %s us)\n",
+      queued_favored, queued_variable, queued_paths, min_bits, max_bits, 
+      ((double)total_bitmap_size) / (total_bitmap_entries ? total_bitmap_entries : 1),
+      DI(min_us), DI(max_us), DI(avg_us));
+
+  if (!timeout_given) {
+
+    /* Figure out the appropriate timeout. The basic idea is: 5x average or
+       1x max, rounded up to EXEC_TM_ROUND ms and capped at 1 second.
+
+       If the program is slow, the multiplier is lowered to 2x or 3x, because
+       random scheduler jitter is less likely to have any impact, and because
+       our patience is wearing thin =) */
+
+    if (avg_us > 50000) exec_tmout = avg_us * 2 / 1000;
+    else if (avg_us > 10000) exec_tmout = avg_us * 3 / 1000;
+    else exec_tmout = avg_us * 5 / 1000;
+
+    exec_tmout = MAX(exec_tmout, max_us / 1000);
+    exec_tmout = (exec_tmout + EXEC_TM_ROUND) / EXEC_TM_ROUND * EXEC_TM_ROUND;
+
+    if (exec_tmout > EXEC_TIMEOUT) exec_tmout = EXEC_TIMEOUT;
+
+    ACTF("No -t option specified, so I'll use exec timeout of %u ms.", 
+         exec_tmout);
+
+    timeout_given = 1;
+
+  } else if (timeout_given == 3) {
+
+    ACTF("Applying timeout settings from resumed session (%u ms).", exec_tmout);
+
+  }
+
+  /* In dumb mode, re-running every timing out test case with a generous time
+     limit is very expensive, so let's select a more conservative default. */
+
+  if (dumb_mode && !getenv("AFL_HANG_TMOUT"))
+    hang_tmout = MIN(EXEC_TIMEOUT, exec_tmout * 2 + 100);
+
+  OKF("All set and ready to roll!");
+
+}
+
+
