@@ -189,9 +189,6 @@ s32 interesting_32[] = { INTERESTING_8, INTERESTING_16, INTERESTING_32 };
 u8  first_run = 1;                /* 首次运行标志 */
 u32 ret_val = 0;                  /* 返回值 */
 
-/* 效果映射数组 */
-u8 eff_map[MAP_SIZE];
-
 /* 初始化函数 */
 void init_globals(void) {
   /* 这里可以添加任何需要的初始化代码 */

@@ -5,13 +5,6 @@
    实现系统相关工具函数
 */
 
-#ifdef HAVE_AFFINITY
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-#include <sched.h>
-#include <sys/sysinfo.h>
-#endif
 
 #include "system.h"
 
@@ -334,8 +327,11 @@ void bind_to_free_cpu(void) {
 
   cpu_aff = i;
 
-  /* CPU affinity disabled during refactoring - functionality preserved but not active */
-  OKF("CPU affinity disabled in refactored version");
+  CPU_ZERO(&c);
+  CPU_SET(i, &c);
+
+  if (sched_setaffinity(0, sizeof(c), &c))
+    PFATAL("sched_setaffinity failed");
 
 }
 

@@ -670,7 +670,7 @@ void maybe_update_plot_file(double bitmap_cvg, double eps) {
    -t given, we don't want to keep auto-scaling the timeout over and over
    again to prevent it from growing due to random flukes. */
 
-s32 find_timeout(void) {
+void find_timeout(void) {
 
   static u8 tmp[4096]; /* Ought to be enough for anybody. */
 
@@ -678,7 +678,7 @@ s32 find_timeout(void) {
   s32 fd, i;
   u32 ret;
 
-  if (!resuming_fuzz) return -1;
+  if (!resuming_fuzz) return;
 
   if (in_place_resume) fn = alloc_printf("%s/fuzzer_stats", out_dir);
   else fn = alloc_printf("%s/../fuzzer_stats", in_dir);
@@ -686,20 +686,19 @@ s32 find_timeout(void) {
   fd = open(fn, O_RDONLY);
   ck_free(fn);
 
-  if (fd < 0) return -1;
+  if (fd < 0) return;
 
   i = read(fd, tmp, sizeof(tmp) - 1); (void)i; /* Ignore errors */
   close(fd);
 
   off = strstr(tmp, "exec_timeout      : ");
-  if (!off) return -1;
+  if (!off) return;
 
   ret = atoi(off + 20);
-  if (ret <= 4) return -1;
+  if (ret <= 4) return;
 
   exec_tmout = ret;
   timeout_given = 3;
-  return ret;
 
 }
 

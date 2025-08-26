@@ -22,8 +22,6 @@ u8 could_be_bitflip(u32 xor_val);
 u8 could_be_arith(u32 old_val, u32 new_val, u8 blen);
 u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le);
 
-/* 辅助函数 */
-extern u8 eff_map[MAP_SIZE];
 /* write_to_testcase is defined in executor.c */
 /* write_with_gap is defined in file_ops.c */
 

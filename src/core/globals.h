@@ -21,6 +21,10 @@
    包含所有全局变量声明和核心数据结构定义
 */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #ifndef AFL_GLOBALS_H
 #define AFL_GLOBALS_H
 
@@ -354,6 +358,6 @@ void setup_shm(void);
 /* 辅助函数声明 */
 void shuffle_ptrs(void** ptrs, u32 cnt);
 u32 hash32(const void* key, u32 len, u32 seed);
-s32 find_timeout(void);
+void find_timeout(void);
 
 #endif /* AFL_GLOBALS_H */
