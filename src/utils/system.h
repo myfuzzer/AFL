@@ -16,6 +16,18 @@ void fix_up_banner(u8* name);
 void check_if_tty(void);
 void check_term_size(void);
 void get_core_count(void);
+void setup_signal_handlers(void);
+void check_asan_opts(void);
+void check_crash_handling(void);
+void check_cpu_governor(void);
+void detect_file_args(char** argv);
+u32 next_p2(u32 val);
+double get_runnable_processes(void);
+void handle_stop_sig(int sig);
+void handle_skipreq(int sig);
+void handle_timeout(int sig);
+void handle_resize(int sig);
+void check_binary(u8* fname);
 
 #ifdef HAVE_AFFINITY
 void bind_to_free_cpu(void);

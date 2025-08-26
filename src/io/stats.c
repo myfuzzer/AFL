@@ -7,6 +7,7 @@
 
 #include "stats.h"
 #include "../utils/timing.h"
+#include "../utils/system.h"
 #include "../analysis/bitmap.h"
 
 extern u8* out_dir;
@@ -34,7 +35,7 @@ void write_bitmap(void);
 
 /* Update stats file for unattended monitoring. */
 
-static void write_stats_file(double bitmap_cvg, double stability, double eps) {
+void write_stats_file(double bitmap_cvg, double stability, double eps) {
 
   static double last_bcvg, last_stab, last_eps;
   static struct rusage usage;
@@ -135,7 +136,7 @@ static void write_stats_file(double bitmap_cvg, double stability, double eps) {
 /* A spiffy retro stats screen! This is called every stats_update_freq
    execve() calls, plus in several other circumstances. */
 
-static void show_stats(void) {
+void show_stats(void) {
 
   static u64 last_stats_ms, last_plot_ms, last_ms, last_execs;
   static double avg_exec;
@@ -620,7 +621,7 @@ static void show_stats(void) {
 
 /* Update the plot file if there is a reason to. */
 
-static void maybe_update_plot_file(double bitmap_cvg, double eps) {
+void maybe_update_plot_file(double bitmap_cvg, double eps) {
 
   static u32 prev_qp, prev_pf, prev_pnf, prev_ce, prev_md;
   static u64 prev_qc, prev_uc, prev_uh;
@@ -664,98 +665,12 @@ static void maybe_update_plot_file(double bitmap_cvg, double eps) {
 
 /* 一个漂亮的复古统计屏幕！这在每个stats_update_freq执行调用时被调用，
    以及在其他几种情况下 */
-void show_stats(void) {
-
-  static u64 last_stats_ms, last_plot_ms, last_ms, last_execs;
-  static double avg_exec;
-  double t_byte_ratio, stab_ratio;
-
-  u64 cur_ms;
-  u32 t_bytes;
-
-  cur_ms = get_cur_time();
-
-  /* 如果自上次UI更新以来没有足够的时间过去，则退出 */
-
-  if (cur_ms - last_ms < 1000 / UI_TARGET_HZ) return;
-
-  /* 检查我们是否过了10分钟标记 */
-
-  if (cur_ms - start_time > 10 * 60 * 1000) run_over10m = 1;
-
-  /* 计算平滑的执行速度统计 */
-
-  if (!last_execs) {
-  
-    avg_exec = ((double)total_execs) * 1000 / (cur_ms - start_time);
-
-  } else {
-
-    double cur_avg = ((double)(total_execs - last_execs)) * 1000 /
-                     (cur_ms - last_ms);
-
-    /* 如果速度有戏剧性的（5x+）跳跃，请更快地重置指示器 */
-
-    if (cur_avg * 5 < avg_exec || cur_avg / 5 > avg_exec)
-      avg_exec = cur_avg;
-
-    avg_exec = avg_exec * (1.0 - 1.0 / AVG_SMOOTHING) +
-               cur_avg * (1.0 / AVG_SMOOTHING);
-
-  }
-
-  last_ms = cur_ms;
-  last_execs = total_execs;
-
-  /* 告诉调用者何时联系我们（以执行次数衡量） */
-
-  stats_update_freq = avg_exec / (UI_TARGET_HZ * 10);
-  if (!stats_update_freq) stats_update_freq = 1;
-
-  /* 做一些位图统计 */
-
-  t_bytes = count_non_255_bytes(virgin_bits);
-  t_byte_ratio = ((double)t_bytes * 100) / MAP_SIZE;
-
-  if (t_bytes) 
-    stab_ratio = 100 - ((double)var_byte_count) * 100 / t_bytes;
-  else
-    stab_ratio = 100;
-
-  /* 大约每分钟，更新模糊器统计并保存自动令牌 */
-
-  if (cur_ms - last_stats_ms > STATS_UPDATE_SEC * 1000) {
-
-    last_stats_ms = cur_ms;
-    write_stats_file(t_byte_ratio, stab_ratio, avg_exec);
-    save_auto();
-    write_bitmap();
-
-  }
-
-  /* 每隔一段时间，写入绘图数据 */
-
-  if (cur_ms - last_plot_ms > PLOT_UPDATE_SEC * 1000) {
-
-    last_plot_ms = cur_ms;
-    maybe_update_plot_file(t_byte_ratio, avg_exec);
- 
-  }
-
-  /* 遵循AFL_EXIT_WHEN_DONE和AFL_BENCH_UNTIL_CRASH */
-
-  if (!dumb_mode && cycles_wo_finds > 100 && !pending_not_fuzzed &&
-      getenv("AFL_EXIT_WHEN_DONE")) stop_soon = 2;
-
-  /* 这里可以添加更多的UI显示逻辑 */
-
-}
 
 /* The same, but for timeouts. The idea is that when resuming sessions without
    -t given, we don't want to keep auto-scaling the timeout over and over
    again to prevent it from growing due to random flukes. */
 
-static void find_timeout(void) {
+s32 find_timeout(void) {
 
   static u8 tmp[4096]; /* Ought to be enough for anybody. */
 
@@ -763,7 +678,7 @@ static void find_timeout(void) {
   s32 fd, i;
   u32 ret;
 
-  if (!resuming_fuzz) return;
+  if (!resuming_fuzz) return -1;
 
   if (in_place_resume) fn = alloc_printf("%s/fuzzer_stats", out_dir);
   else fn = alloc_printf("%s/../fuzzer_stats", in_dir);
@@ -771,19 +686,20 @@ static void find_timeout(void) {
   fd = open(fn, O_RDONLY);
   ck_free(fn);
 
-  if (fd < 0) return;
+  if (fd < 0) return -1;
 
   i = read(fd, tmp, sizeof(tmp) - 1); (void)i; /* Ignore errors */
   close(fd);
 
   off = strstr(tmp, "exec_timeout      : ");
-  if (!off) return;
+  if (!off) return -1;
 
   ret = atoi(off + 20);
-  if (ret <= 4) return;
+  if (ret <= 4) return -1;
 
   exec_tmout = ret;
   timeout_given = 3;
+  return ret;
 
 }
 
@@ -793,7 +709,7 @@ static void find_timeout(void) {
    plus a bunch of warnings. Some calibration stuff also ended up here,
    along with several hardcoded constants. Maybe clean up eventually. */
 
-static void show_init_stats(void) {
+void show_init_stats(void) {
 
   struct queue_entry* q = queue;
   u32 min_bits = 0, max_bits = 0;

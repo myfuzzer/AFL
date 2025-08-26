@@ -281,7 +281,11 @@ extern u32 a_extras_cnt;              /* 可用token总数 */
 /* 后处理处理程序 */
 extern u8* (*post_handler)(u8* buf, u32* len);
 
-/* 有趣的值 */
+/* 有趣的值及其大小 */
+#define INTERESTING_8_LEN    18   /* INTERESTING_8 array length */
+#define INTERESTING_16_LEN   38   /* INTERESTING_8 + INTERESTING_16 array length */  
+#define INTERESTING_32_LEN   48   /* INTERESTING_8 + INTERESTING_16 + INTERESTING_32 array length */
+
 extern s8  interesting_8[];
 extern s16 interesting_16[];
 extern s32 interesting_32[];
@@ -345,6 +349,7 @@ extern u32 ret_val;                /* 返回值 */
 /* 全局函数声明 */
 void init_globals(void);
 void cleanup_globals(void);
+void setup_shm(void);
 
 /* 辅助函数声明 */
 void shuffle_ptrs(void** ptrs, u32 cnt);

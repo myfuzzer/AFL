@@ -7,7 +7,11 @@
 
 #include "mutations.h"
 #include "../utils/random.h"
+#include "../utils/system.h"
+#include "../utils/timing.h"
 #include "../analysis/bitmap.h"
+#include "../core/queue.h"
+#include "../io/stats.h"
 #include "../core/executor.h"
 #include "../io/file_ops.h"
 
@@ -19,18 +23,19 @@ extern u8  stage_val_type;
 extern u64 stage_finds[32], stage_cycles[32];
 
 extern struct queue_entry *queue_cur;
-extern u32 queued_paths, pending_favored, queue_cycle;
+extern u32 queued_paths, pending_favored;
+extern u64 queue_cycle;
 extern u8 dumb_mode;
 extern s32 splicing_with;
 
 /* 效应器映射 - 跟踪哪些字节影响程序行为 */
-u8 eff_map[MAP_SIZE];
+/* eff_map is defined in globals.c */
 
 
 /* Helper to choose random block len for block operations in fuzz_one().
    Doesn't return zero, provided that max_len is > 0. */
 
-static u32 choose_block_len(u32 limit) {
+u32 choose_block_len(u32 limit) {
 
   u32 min_value, max_value;
   u32 rlim = MIN(queue_cycle, 3);
@@ -74,7 +79,7 @@ static u32 choose_block_len(u32 limit) {
    A helper function for fuzz_one(). Maybe some of these constants should
    go into config.h. */
 
-static u32 calculate_score(struct queue_entry* q) {
+u32 calculate_score(struct queue_entry* q) {
 
   u32 avg_exec_us = total_cal_us / total_cal_cycles;
   u32 avg_bitmap_size = total_bitmap_size / total_bitmap_entries;
@@ -148,7 +153,7 @@ static u32 calculate_score(struct queue_entry* q) {
    return 1 if xor_val is zero, which implies that the old and attempted new
    values are identical and the exec would be a waste of time. */
 
-static u8 could_be_bitflip(u32 xor_val) {
+u8 could_be_bitflip(u32 xor_val) {
 
   u32 sh = 0;
 
@@ -177,7 +182,7 @@ static u8 could_be_bitflip(u32 xor_val) {
 /* Helper function to see if a particular value is reachable through
    arithmetic operations. Used for similar purposes. */
 
-static u8 could_be_arith(u32 old_val, u32 new_val, u8 blen) {
+u8 could_be_arith(u32 old_val, u32 new_val, u8 blen) {
 
   u32 i, ov = 0, nv = 0, diffs = 0;
 
@@ -256,7 +261,7 @@ static u8 could_be_arith(u32 old_val, u32 new_val, u8 blen) {
    function is a tad too long... returns 0 if fuzzed successfully, 1 if
    skipped or bailed out. */
 
-static u8 fuzz_one(char** argv) {
+u8 fuzz_one(char** argv) {
 
   s32 len, fd, temp_len, i, j;
   u8  *in_buf, *out_buf, *orig_in, *ex_tmp, *eff_map = 0;
@@ -1009,7 +1014,7 @@ skip_arith:
   stage_name  = "interest 8/8";
   stage_short = "int8";
   stage_cur   = 0;
-  stage_max   = len * sizeof(interesting_8);
+  stage_max   = len * INTERESTING_8_LEN;
 
   stage_val_type = STAGE_VAL_LE;
 
@@ -1024,13 +1029,13 @@ skip_arith:
     /* Let's consult the effector map... */
 
     if (!eff_map[EFF_APOS(i)]) {
-      stage_max -= sizeof(interesting_8);
+      stage_max -= INTERESTING_8_LEN;
       continue;
     }
 
     stage_cur_byte = i;
 
-    for (j = 0; j < sizeof(interesting_8); j++) {
+    for (j = 0; j < INTERESTING_8_LEN; j++) {
 
       /* Skip if the value could be a product of bitflips or arithmetics. */
 
@@ -1064,7 +1069,7 @@ skip_arith:
   stage_name  = "interest 16/8";
   stage_short = "int16";
   stage_cur   = 0;
-  stage_max   = 2 * (len - 1) * (sizeof(interesting_16) >> 1);
+  stage_max   = 2 * (len - 1) * (INTERESTING_16_LEN);
 
   orig_hit_cnt = new_hit_cnt;
 
@@ -1075,13 +1080,13 @@ skip_arith:
     /* Let's consult the effector map... */
 
     if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) {
-      stage_max -= sizeof(interesting_16);
+      stage_max -= INTERESTING_16_LEN * sizeof(s16);
       continue;
     }
 
     stage_cur_byte = i;
 
-    for (j = 0; j < sizeof(interesting_16) / 2; j++) {
+    for (j = 0; j < INTERESTING_16_LEN; j++) {
 
       stage_cur_val = interesting_16[j];
 
@@ -1132,7 +1137,7 @@ skip_arith:
   stage_name  = "interest 32/8";
   stage_short = "int32";
   stage_cur   = 0;
-  stage_max   = 2 * (len - 3) * (sizeof(interesting_32) >> 2);
+  stage_max   = 2 * (len - 3) * (INTERESTING_32_LEN);
 
   orig_hit_cnt = new_hit_cnt;
 
@@ -1144,13 +1149,13 @@ skip_arith:
 
     if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
         !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) {
-      stage_max -= sizeof(interesting_32) >> 1;
+      stage_max -= INTERESTING_32_LEN * sizeof(s32) >> 1;
       continue;
     }
 
     stage_cur_byte = i;
 
-    for (j = 0; j < sizeof(interesting_32) / 4; j++) {
+    for (j = 0; j < INTERESTING_32_LEN; j++) {
 
       stage_cur_val = interesting_32[j];
 
@@ -1431,7 +1436,7 @@ havoc_stage:
 
           /* Set byte to interesting value. */
 
-          out_buf[UR(temp_len)] = interesting_8[UR(sizeof(interesting_8))];
+          out_buf[UR(temp_len)] = interesting_8[UR(INTERESTING_8_LEN)];
           break;
 
         case 2:
@@ -1443,12 +1448,12 @@ havoc_stage:
           if (UR(2)) {
 
             *(u16*)(out_buf + UR(temp_len - 1)) =
-              interesting_16[UR(sizeof(interesting_16) >> 1)];
+              interesting_16[UR(INTERESTING_16_LEN)];
 
           } else {
 
             *(u16*)(out_buf + UR(temp_len - 1)) = SWAP16(
-              interesting_16[UR(sizeof(interesting_16) >> 1)]);
+              interesting_16[UR(INTERESTING_16_LEN)]);
 
           }
 
@@ -1463,12 +1468,12 @@ havoc_stage:
           if (UR(2)) {
   
             *(u32*)(out_buf + UR(temp_len - 3)) =
-              interesting_32[UR(sizeof(interesting_32) >> 2)];
+              interesting_32[UR(INTERESTING_32_LEN)];
 
           } else {
 
             *(u32*)(out_buf + UR(temp_len - 3)) = SWAP32(
-              interesting_32[UR(sizeof(interesting_32) >> 2)]);
+              interesting_32[UR(INTERESTING_32_LEN)]);
 
           }
 
@@ -1950,69 +1955,10 @@ abandon_entry:
 
 
 /* 校准测试用例 - 简化版本 */
-u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem, u32 handicap, u8 from_queue) {
-  
-  static u8 first_trace[MAP_SIZE];
-  
-  u8 fault = 0, new_bits = 0, var_detected = 0;
-  u64 start_us, stop_us;
-
-  /* 简化的校准逻辑 */
-  stage_name = "calibration";
-  stage_max = CAL_CYCLES;
-
-  for (stage_cur = 0; stage_cur < CAL_CYCLES; stage_cur++) {
-
-    u32 cksum;
-
-    if (!from_queue && !stage_cur)
-      write_to_testcase(use_mem, q->len);
-
-    fault = run_target(argv, exec_tmout);
-
-    /* 处理故障情况 */
-    if (stop_soon || fault != crash_mode) {
-      ret_val = FAULT_TMOUT;
-      break;
-    }
-
-    if (!stage_cur) {
-      first_run = 0;
-      memcpy(first_trace, trace_bits, MAP_SIZE);
-    }
-
-    cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
-
-    if (q->exec_cksum != cksum) {
-      u8 hnb = has_new_bits(virgin_bits);
-      if (hnb > new_bits) new_bits = hnb;
-
-      if (q->exec_cksum) {
-        u32 i;
-        for (i = 0; i < MAP_SIZE; i++) {
-          if (!var_bytes[i] && first_trace[i] != trace_bits[i]) {
-            var_bytes[i] = 1;
-            stage_max = CAL_CYCLES_LONG;
-          }
-        }
-        var_detected = 1;
-      } else {
-        q->exec_cksum = cksum;
-        memcpy(first_trace, trace_bits, MAP_SIZE);
-      }
-    }
-  }
-
-  if (new_bits) {
-    queued_with_cov++;
-  }
-
-  return fault;
-}
 
 /* Load postprocessor, if available. */
 
-static void setup_post(void) {
+void setup_post(void) {
 
   void* dh;
   u8* fn = getenv("AFL_POST_LIBRARY");
@@ -2196,7 +2142,7 @@ static void load_extras_file(u8* fname, u32* min_len, u32* max_len,
 
 /* Read extras from the extras directory and sort them by size. */
 
-static void load_extras(u8* dir) {
+void load_extras(u8* dir) {
 
   DIR* d;
   struct dirent* de;
@@ -2296,7 +2242,7 @@ check_and_sort:
 
 /* Maybe add automatic extra. */
 
-static void maybe_add_auto(u8* mem, u32 len) {
+void maybe_add_auto(u8* mem, u32 len) {
 
   u32 i;
 
@@ -2315,7 +2261,7 @@ static void maybe_add_auto(u8* mem, u32 len) {
 
   if (len == 2) {
 
-    i = sizeof(interesting_16) >> 1;
+    i = INTERESTING_16_LEN;
 
     while (i--) 
       if (*((u16*)mem) == interesting_16[i] ||
@@ -2325,7 +2271,7 @@ static void maybe_add_auto(u8* mem, u32 len) {
 
   if (len == 4) {
 
-    i = sizeof(interesting_32) >> 2;
+    i = INTERESTING_32_LEN;
 
     while (i--) 
       if (*((u32*)mem) == interesting_32[i] ||
@@ -2403,7 +2349,7 @@ sort_a_extras:
 
 /* Load automatically generated extras. */
 
-static void load_auto(void) {
+void load_auto(void) {
 
   u32 i;
 
@@ -2446,7 +2392,7 @@ static void load_auto(void) {
 
 /* Destroy extras. */
 
-static void destroy_extras(void) {
+void destroy_extras(void) {
 
   u32 i;
 
@@ -2469,7 +2415,7 @@ static void destroy_extras(void) {
    already executed LE insertion for current blen and wants to see
    if BE variant passed in new_val is unique. */
 
-static u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
+u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
   u32 i, j;
 
@@ -2480,7 +2426,7 @@ static u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
   for (i = 0; i < blen; i++) {
 
-    for (j = 0; j < sizeof(interesting_8); j++) {
+    for (j = 0; j < INTERESTING_8_LEN; j++) {
 
       u32 tval = (old_val & ~(0xff << (i * 8))) |
                  (((u8)interesting_8[j]) << (i * 8));
@@ -2500,7 +2446,7 @@ static u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
   for (i = 0; i < blen - 1; i++) {
 
-    for (j = 0; j < sizeof(interesting_16) / 2; j++) {
+    for (j = 0; j < INTERESTING_16_LEN; j++) {
 
       u32 tval = (old_val & ~(0xffff << (i * 8))) |
                  (((u16)interesting_16[j]) << (i * 8));
@@ -2527,7 +2473,7 @@ static u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
     /* See if four-byte insertions could produce the same result
        (LE only). */
 
-    for (j = 0; j < sizeof(interesting_32) / 4; j++)
+    for (j = 0; j < INTERESTING_32_LEN; j++)
       if (new_val == (u32)interesting_32[j]) return 1;
 
   }
@@ -2542,7 +2488,7 @@ static u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
    trimmer uses power-of-two increments somewhere between 1/16 and 1/1024 of
    file size, to keep the stage short and sweet. */
 
-static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
+u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
 
   static u8 tmp[64];
   static u8 clean_trace[MAP_SIZE];
@@ -2663,7 +2609,7 @@ abort_trimming:
 
 /* Helper function for maybe_add_auto() */
 
-static inline u8 memcmp_nocase(u8* m1, u8* m2, u32 len) {
+u8 memcmp_nocase(u8* m1, u8* m2, u32 len) {
 
   while (len--) if (tolower(*(m1++)) ^ tolower(*(m2++))) return 1;
   return 0;
