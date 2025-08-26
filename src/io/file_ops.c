@@ -7,12 +7,14 @@
 
 #include "file_ops.h"
 #include "../utils/random.h"
+#include "../utils/timing.h"
+#include "../core/queue.h"
 
 
 
 /* Helper function: link() if possible, copy otherwise. */
 
-static void link_or_copy(u8* old_path, u8* new_path) {
+void link_or_copy(u8* old_path, u8* new_path) {
 
   s32 i = link(old_path, new_path);
   s32 sfd, dfd;
@@ -43,30 +45,13 @@ static void link_or_copy(u8* old_path, u8* new_path) {
 
 
 
-/* 将修改后的数据写入文件进行测试 */
-void write_to_testcase(void* mem, u32 len) {
-
-  s32 fd = out_fd;
-
-  if (out_file) {
-    fd = open(out_file, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-    if (fd < 0) PFATAL("Unable to open '%s'", out_file);
-  } else lseek(fd, 0, SEEK_SET);
-
-  ck_write(fd, mem, len, out_file);
-
-  if (!out_file) {
-    if (ftruncate(fd, len)) PFATAL("ftruncate() failed");
-    lseek(fd, 0, SEEK_SET);
-  } else close(fd);
-}
 
 
 
 
 /* The same, but with an adjustable gap. Used for trimming. */
 
-static void write_with_gap(void* mem, u32 len, u32 skip_at, u32 skip_len) {
+void write_with_gap(void* mem, u32 len, u32 skip_at, u32 skip_len) {
 
   s32 fd = out_fd;
   u32 tail_len = len - skip_at - skip_len;
@@ -102,7 +87,7 @@ static void write_with_gap(void* mem, u32 len, u32 skip_at, u32 skip_len) {
 /* Read all testcases from the input directory, then queue them for testing.
    Called at startup. */
 
-static void read_testcases(void) {
+void read_testcases(void) {
 
   struct dirent **nl;
   s32 nl_cnt;
@@ -205,7 +190,7 @@ static void read_testcases(void) {
 /* Create hard links for input test cases in the output directory, choosing
    good names and pivoting accordingly. */
 
-static void pivot_inputs(void) {
+void pivot_inputs(void) {
 
   struct queue_entry* q = queue;
   u32 id = 0;
@@ -296,7 +281,7 @@ static void pivot_inputs(void) {
 
 /* Write a message accompanying the crash directory :-) */
 
-static void write_crash_readme(void) {
+void write_crash_readme(void) {
 
   u8* fn = alloc_printf("%s/crashes/README.txt", out_dir);
   s32 fd;
@@ -377,7 +362,7 @@ static u8 delete_files(u8* path, u8* prefix) {
 
 /* Delete the temporary directory used for in-place session resume. */
 
-static void nuke_resume_dir(void) {
+void nuke_resume_dir(void) {
 
   u8* fn;
 
@@ -664,7 +649,7 @@ dir_cleanup_failed:
 
 /* Prepare output directories and fds. */
 
-EXP_ST void setup_dirs_fds(void) {
+void setup_dirs_fds(void) {
 
   u8* tmp;
   s32 fd;
@@ -788,7 +773,7 @@ EXP_ST void setup_dirs_fds(void) {
 
 /* Setup the output file for fuzzed data, if not using -f. */
 
-EXP_ST void setup_stdio_file(void) {
+void setup_stdio_file(void) {
 
   u8* fn = alloc_printf("%s/.cur_input", out_dir);
 
@@ -807,7 +792,7 @@ EXP_ST void setup_stdio_file(void) {
 /* Construct a file name for a new test case, capturing the operation
    that led to its discovery. Uses a static buffer. */
 
-static u8* describe_op(u8 hnb) {
+u8* describe_op(u8 hnb) {
 
   static u8 ret[256];
 

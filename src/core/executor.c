@@ -8,6 +8,7 @@
 #include "executor.h"
 #include "../utils/timing.h"
 #include "../analysis/bitmap.h"
+#include "../analysis/coverage.h"
 #include "queue.h"
 
 extern u8* trace_bits;
@@ -44,7 +45,7 @@ extern u32 stats_update_freq;
 /* Execute target application, monitoring for timeouts. Return status
    information. The called program will update trace_bits[]. */
 
-static u8 run_target(char** argv, u32 timeout) {
+u8 run_target(char** argv, u32 timeout) {
 
   static struct itimerval it;
   static u32 prev_timed_out = 0;
@@ -264,7 +265,7 @@ static u8 run_target(char** argv, u32 timeout) {
    is unlinked and a new one is created. Otherwise, out_fd is rewound and
    truncated. */
 
-static void write_to_testcase(void* mem, u32 len) {
+void write_to_testcase(void* mem, u32 len) {
 
   s32 fd = out_fd;
 
@@ -294,7 +295,7 @@ static void write_to_testcase(void* mem, u32 len) {
    to warn about flaky or otherwise problematic test cases early on; and when
    new paths are discovered to detect variable behavior and so on. */
 
-static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
+u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
                          u32 handicap, u8 from_queue) {
 
   static u8 first_trace[MAP_SIZE];
@@ -449,7 +450,7 @@ abort_calibration:
 /* Perform dry run of all test cases to confirm that the app is working as
    expected. This is done only for the initial inputs, and only once. */
 
-static void perform_dry_run(char** argv) {
+void perform_dry_run(char** argv) {
 
   struct queue_entry* q = queue;
   u32 cal_failures = 0;
@@ -655,7 +656,7 @@ static void perform_dry_run(char** argv) {
    error conditions, returning 1 if it's time to bail out. This is
    a helper function for fuzz_one(). */
 
-EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
+u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
 
   u8 fault;
 

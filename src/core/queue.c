@@ -8,6 +8,9 @@
 #include "queue.h"
 #include "../utils/timing.h"
 #include "../analysis/bitmap.h"
+#include "../io/file_ops.h"
+#include "../mutation/mutations.h"
+#include "../core/executor.h"
 
 extern struct queue_entry *queue, *queue_cur, *queue_top, *q_prev100;
 extern u32 queued_paths, pending_not_fuzzed, cur_depth, max_depth;
@@ -18,7 +21,7 @@ extern u8 *out_dir;
 
 /* Append new test case to the queue. */
 
-static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
+void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
   struct queue_entry* q = ck_alloc(sizeof(struct queue_entry));
 
@@ -57,7 +60,7 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
 /* Destroy the entire queue. */
 
-EXP_ST void destroy_queue(void) {
+void destroy_queue(void) {
 
   struct queue_entry *q = queue, *n;
 
@@ -78,7 +81,7 @@ EXP_ST void destroy_queue(void) {
    .state file to avoid repeating deterministic fuzzing when resuming aborted
    scans. */
 
-static void mark_as_det_done(struct queue_entry* q) {
+void mark_as_det_done(struct queue_entry* q) {
 
   u8* fn = strrchr(q->fname, '/');
   s32 fd;
@@ -99,7 +102,7 @@ static void mark_as_det_done(struct queue_entry* q) {
 /* Mark as variable. Create symlinks if possible to make it easier to examine
    the files. */
 
-static void mark_as_variable(struct queue_entry* q) {
+void mark_as_variable(struct queue_entry* q) {
 
   u8 *fn = strrchr(q->fname, '/') + 1, *ldest;
 
@@ -128,7 +131,7 @@ static void mark_as_variable(struct queue_entry* q) {
 /* Mark / unmark as redundant (edge-only). This is not used for restoring state,
    but may be useful for post-processing datasets. */
 
-static void mark_as_redundant(struct queue_entry* q, u8 state) {
+void mark_as_redundant(struct queue_entry* q, u8 state) {
 
   u8* fn;
   s32 fd;
@@ -171,7 +174,7 @@ extern u8 score_changed, dumb_mode;
    until the next run. The favored entries are given more air time during
    all fuzzing steps. */
 
-static void cull_queue(void) {
+void cull_queue(void) {
 
   struct queue_entry* q;
   static u8 temp_v[MAP_SIZE >> 3];
@@ -243,7 +246,7 @@ extern u8* trace_bits;
    for every byte in the bitmap. We win that slot if there is no previous
    contender, or if the contender has a more favorable speed x size factor. */
 
-static void update_bitmap_score(struct queue_entry* q) {
+void update_bitmap_score(struct queue_entry* q) {
 
   u32 i;
   u64 fav_factor = q->exec_us * q->len;
@@ -291,7 +294,7 @@ static void update_bitmap_score(struct queue_entry* q) {
    save or queue the input test case for further analysis if so. Returns 1 if
    entry is saved, 0 otherwise. */
 
-static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
+u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
   u8  *fn = "";
   u8  hnb;

@@ -10,6 +10,7 @@
 #include "../utils/system.h"
 #include "../utils/random.h"
 #include "../analysis/bitmap.h"
+#include "../analysis/coverage.h"
 #include "../core/queue.h"
 #include "../core/executor.h"
 #include "../io/stats.h"
@@ -20,7 +21,7 @@
 
 /* Display usage hints. */
 
-static void usage(u8* argv0) {
+void usage(u8* argv0) {
 
   SAYF("\n%s [ options ] -- /path/to/fuzzed_app [ ... ]\n\n"
 
@@ -62,7 +63,7 @@ static void usage(u8* argv0) {
 
 /* Make a copy of the current command line. */
 
-static void save_cmdline(u32 argc, char** argv) {
+void save_cmdline(u32 argc, char** argv) {
 
   u32 len = 1, i;
   u8* buf;
@@ -96,7 +97,7 @@ static void save_cmdline(u32 argc, char** argv) {
 
 /* Rewrite argv for QEMU. */
 
-static char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
+char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
 
   char** new_argv = ck_alloc(sizeof(char*) * (argc + 4));
   u8 *tmp, *cp, *rsl, *own_copy;

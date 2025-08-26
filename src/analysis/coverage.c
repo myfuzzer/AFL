@@ -6,6 +6,7 @@
 */
 
 #include "coverage.h"
+#include "bitmap.h"
 
 extern u8* trace_bits;
 extern u8* out_dir;
@@ -16,7 +17,7 @@ extern u8* out_dir;
    -B option, to focus a separate fuzzing session on a particular
    interesting input without rediscovering all the others. */
 
-EXP_ST void write_bitmap(void) {
+void write_bitmap(void) {
 
   u8* fname;
   s32 fd;
@@ -38,7 +39,7 @@ EXP_ST void write_bitmap(void) {
 
 /* Examine map coverage. Called once, for first test case. */
 
-static void check_map_coverage(void) {
+void check_map_coverage(void) {
 
   u32 i;
 

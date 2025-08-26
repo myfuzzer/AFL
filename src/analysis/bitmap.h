@@ -28,4 +28,10 @@ void simplify_trace(u32* mem);
 #endif
 void classify_counts(u64* mem);
 
+/* 位图文件操作 */
+void read_bitmap(u8* fname);
+
+/* 辅助函数 */
+void locate_diffs(u8* ptr1, u8* ptr2, u32 len, s32* first, s32* last);
+
 #endif /* AFL_BITMAP_H */

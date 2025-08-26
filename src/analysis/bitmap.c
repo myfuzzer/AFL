@@ -50,7 +50,7 @@ static const u8 simplify_lookup[256] = {
    count information here. This is called only sporadically, for some
    new paths. */
 
-static void minimize_bits(u8* dst, u8* src) {
+void minimize_bits(u8* dst, u8* src) {
 
   u32 i = 0;
 
@@ -74,7 +74,7 @@ static void minimize_bits(u8* dst, u8* src) {
    This function is called after every exec() on a fairly large buffer, so
    it needs to be fast. We do this in 32-bit and 64-bit flavors. */
 
-static inline u8 has_new_bits(u8* virgin_map) {
+u8 has_new_bits(u8* virgin_map) {
 
 #ifdef WORD_SIZE_64
 
@@ -150,7 +150,7 @@ static inline u8 has_new_bits(u8* virgin_map) {
 /* Count the number of bits set in the provided bitmap. Used for the status
    screen several times every second, does not have to be fast. */
 
-static u32 count_bits(u8* mem) {
+u32 count_bits(u8* mem) {
 
   u32* ptr = (u32*)mem;
   u32  i   = (MAP_SIZE >> 2);
@@ -188,7 +188,7 @@ static u32 count_bits(u8* mem) {
    mostly to update the status screen or calibrate and examine confirmed
    new paths. */
 
-static u32 count_bytes(u8* mem) {
+u32 count_bytes(u8* mem) {
 
   u32* ptr = (u32*)mem;
   u32  i   = (MAP_SIZE >> 2);
@@ -215,7 +215,7 @@ static u32 count_bytes(u8* mem) {
 /* Count the number of non-255 bytes set in the bitmap. Used strictly for the
    status screen, several calls per second or so. */
 
-static u32 count_non_255_bytes(u8* mem) {
+u32 count_non_255_bytes(u8* mem) {
 
   u32* ptr = (u32*)mem;
   u32  i   = (MAP_SIZE >> 2);
@@ -245,7 +245,7 @@ static u32 count_non_255_bytes(u8* mem) {
 
 #ifdef WORD_SIZE_64
 
-static void simplify_trace(u64* mem) {
+void simplify_trace(u64* mem) {
 
   u32 i = MAP_SIZE >> 3;
 
@@ -307,7 +307,7 @@ static void simplify_trace(u32* mem) {
 
 #ifdef WORD_SIZE_64
 
-static inline void classify_counts(u64* mem) {
+void classify_counts(u64* mem) {
 
   u32 i = MAP_SIZE >> 3;
 
@@ -367,7 +367,7 @@ static inline void classify_counts(u32* mem) {
 
 
 
-EXP_ST void init_count_class16(void) {
+void init_count_class16(void) {
 
   u32 b1, b2;
 
@@ -384,7 +384,7 @@ EXP_ST void init_count_class16(void) {
 /* Helper function to compare buffers; returns first and last differing offset. We
    use this to find reasonable locations for splicing two files. */
 
-static void locate_diffs(u8* ptr1, u8* ptr2, u32 len, s32* first, s32* last) {
+void locate_diffs(u8* ptr1, u8* ptr2, u32 len, s32* first, s32* last) {
 
   s32 f_loc = -1;
   s32 l_loc = -1;
@@ -413,7 +413,7 @@ static void locate_diffs(u8* ptr1, u8* ptr2, u32 len, s32* first, s32* last) {
 
 /* Read bitmap from file. This is for the -B option again. */
 
-EXP_ST void read_bitmap(u8* fname) {
+void read_bitmap(u8* fname) {
 
   s32 fd = open(fname, O_RDONLY);
 

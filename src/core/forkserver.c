@@ -29,7 +29,7 @@ extern FILE* plot_file;
    cloning a stopped child. So, we just execute once, and then send commands
    through a pipe. The other part of this logic is in afl-as.h. */
 
-EXP_ST void init_forkserver(char** argv) {
+void init_forkserver(char** argv) {
 
   static struct itimerval it;
   int st_pipe[2], ctl_pipe[2];

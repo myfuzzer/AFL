@@ -8,6 +8,9 @@
 #include "sync.h"
 #include "../utils/timing.h"
 #include "../io/file_ops.h"
+#include "../core/queue.h"
+#include "../core/executor.h"
+#include "../io/stats.h"
 
 extern u8* sync_dir;
 extern u8* sync_id; 
@@ -19,7 +22,7 @@ extern u8 dumb_mode;
 
 /* Validate and fix up out_dir and sync_dir when using -S. */
 
-static void fix_up_sync(void) {
+void fix_up_sync(void) {
 
   u8* x = sync_id;
 
@@ -64,7 +67,7 @@ static void fix_up_sync(void) {
 /* When resuming, try to find the queue position to start from. This makes sense
    only when resuming, and when we can find the original fuzzer_stats. */
 
-static u32 find_start_position(void) {
+u32 find_start_position(void) {
 
   static u8 tmp[4096]; /* Ought to be enough for anybody. */
 
@@ -98,7 +101,7 @@ static u32 find_start_position(void) {
 
 /* Grab interesting test cases from other fuzzers. */
 
-static void sync_fuzzers(char** argv) {
+void sync_fuzzers(char** argv) {
 
   DIR* sd;
   struct dirent* sd_ent;

@@ -13,7 +13,7 @@ extern s32 dev_urandom_fd;
 /* Generate a random number (from 0 to limit - 1). This may
    have slight bias. */
 
-static inline u32 UR(u32 limit) {
+u32 UR(u32 limit) {
 
   if (unlikely(!rand_cnt--)) {
 
@@ -32,7 +32,7 @@ static inline u32 UR(u32 limit) {
 
 /* Shuffle an array of pointers. Might be slightly biased. */
 
-static void shuffle_ptrs(void** ptrs, u32 cnt) {
+void shuffle_ptrs(void** ptrs, u32 cnt) {
 
   u32 i;
 

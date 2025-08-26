@@ -18,6 +18,7 @@ u8* DTD(u64 cur_ms, u64 event_ms);
 /* 格式化函数 */
 u8* DI(u64 val);
 u8* DMS(u64 val);
+u8* DF(double val);
 
 /* 哈希函数 */
 u32 hash32(const void* key, u32 len, u32 seed);
