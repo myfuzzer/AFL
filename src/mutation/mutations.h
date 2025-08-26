@@ -3,6 +3,28 @@
 #define AFL_MUTATIONS_H
 
 #include "../core/globals.h"
+#include "../utils/random.h"
+#include "../utils/system.h"
+#include "../utils/timing.h"
+#include "../analysis/bitmap.h"
+#include "../core/queue.h"
+#include "../io/stats.h"
+#include "../core/executor.h"
+#include "../io/file_ops.h"
+
+/* External variables used across mutation modules */
+extern u8* stage_name;
+extern u8* stage_short;
+extern s32 stage_cur, stage_max;
+extern s32 stage_cur_byte, stage_cur_val;
+extern u8  stage_val_type;
+extern u64 stage_finds[32], stage_cycles[32];
+
+extern struct queue_entry *queue_cur;
+extern u32 queued_paths, pending_favored;
+extern u64 queue_cycle;
+extern u8 dumb_mode;
+extern s32 splicing_with;
 
 /* 模糊测试阶段枚举在globals.h中定义 */
 
