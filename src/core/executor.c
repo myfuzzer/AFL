@@ -22,18 +22,16 @@ extern u8 fast_cal;
 extern u32 queued_paths, queued_with_cov, queued_variable;
 extern u64 unique_crashes;
 extern u8 virgin_bits[MAP_SIZE], var_bytes[MAP_SIZE];
-
-/* 前向声明 */
-void init_forkserver(char** argv);
-void show_stats(void);
-u8 has_new_bits(u8* virgin_map);
 extern u32 var_byte_count;
 extern u64 total_bitmap_size, total_bitmap_entries;
 extern u8* stage_name;
 extern s32 stage_cur, stage_max;
 extern u32 stats_update_freq;
 
-
+// 外部文件中的函数依赖
+void init_forkserver(char** argv);
+void show_stats(void);
+u8 has_new_bits(u8* virgin_map);
 
 
 /* Execute target application, monitoring for timeouts. Return status
