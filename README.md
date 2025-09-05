@@ -126,3 +126,7 @@ if (queued_paths != havoc_queued) {
     - 如果是队尾, 则增加 `queue_cycle++` 计数, 并回到起始点
 - fuzz_one()
 - 切换到下一个 queue
+
+### 致谢
+
+本项目包含并基于 Google 的 american fuzzy lop (AFL) 项目的源代码。感谢 Google 对开源社区与软件安全生态的长期贡献。
