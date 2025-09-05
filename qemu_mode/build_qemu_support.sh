@@ -29,9 +29,15 @@
 #
 
 
-VERSION="2.10.0"
-QEMU_URL="http://download.qemu-project.org/qemu-${VERSION}.tar.xz"
-QEMU_SHA384="68216c935487bc8c0596ac309e1e3ee75c2c4ce898aab796faa321db5740609ced365fedda025678d072d09ac8928105"
+# You can install dependencies with following commands (in Docker ubuntu:22.04). 
+# sed -i 's|archive.ubuntu.com|mirrors.cloud.tencent.com|g; s|security.ubuntu.com|mirrors.cloud.tencent.com|g' /etc/apt/sources.list && apt-get update
+# apt-get install -y build-essential python2 libtool-bin wget bison flex libglib2.0-dev libcapstone-dev libpixman-1-dev
+# ln -s /usr/bin/python2 /usr/bin/python
+
+
+VERSION="2.12.1"
+QEMU_URL="https://download.qemu.org/qemu-${VERSION}.tar.xz"
+QEMU_SHA384="92957551a3a21b1ed48dc70d9dd91905859a5565ec98492ed709a3b64daf7c5a0265d670030ee7e6d16da96436795435"
 
 echo "================================================="
 echo "AFL binary-only instrumentation QEMU build script"
@@ -62,7 +68,7 @@ if [ ! -f "../afl-showmap" ]; then
 fi
 
 
-for i in libtool wget python automake autoconf sha384sum bison iconv; do
+for i in libtool wget python automake autoconf sha384sum bison iconv flex; do
 
   T=`which "$i" 2>/dev/null`
 
@@ -78,6 +84,13 @@ done
 if [ ! -d "/usr/include/glib-2.0/" -a ! -d "/usr/local/include/glib-2.0/" ]; then
 
   echo "[-] Error: devel version of 'glib2' not found, please install first."
+  exit 1
+
+fi
+
+if [ ! -d "/usr/include/capstone/" -a ! -d "/usr/local/include/capstone/" ]; then
+
+  echo "[-] Error: devel version of 'libcapstone' not found, please install first."
   exit 1
 
 fi
@@ -137,8 +150,17 @@ echo "[*] Applying patches..."
 patch -p1 <../patches/elfload.diff || exit 1
 patch -p1 <../patches/cpu-exec.diff || exit 1
 patch -p1 <../patches/syscall.diff || exit 1
-patch -p1 <../patches/configure.diff || exit 1
-patch -p1 <../patches/memfd.diff || exit 1
+
+# check to see if we need updated options for libcapstone
+grep /usr/include/capstone/capstone.h -e "CS_OPT_SKIPDATA" 2>&1 >/dev/null || grep /usr/local/include/capstone/capstone.h -e "CS_OPT_SKIPDATA" 2>&1 >/dev/null
+if [ $? -eq 1 ]; then
+  # I have a mahcine on Debian jessie still and can confirm the strech debs work
+  # http://ftp.us.debian.org/debian/pool/main/c/capstone/libcapstone3_3.0.4-1_amd64.deb
+  # http://ftp.us.debian.org/debian/pool/main/c/capstone/libcapstone-dev_3.0.4-1_amd64.deb
+  echo "[-] Error: too old of version libcapstone-dev. Please install >= libcapstone3 from source."
+fi;
+patch -p1 <../patches/capstone.diff || exit 1
+
 
 echo "[+] Patching done."
 
@@ -153,7 +175,7 @@ echo "[+] Configuration complete."
 
 echo "[*] Attempting to build QEMU (fingers crossed!)..."
 
-make || exit 1
+make -j || exit 1
 
 echo "[+] Build process successful!"
 
