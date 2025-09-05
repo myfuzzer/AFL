@@ -73,23 +73,11 @@ afl-fuzz: afl-fuzz.c $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) afl-fuzz.c -o $@ $(LDFLAGS)
 
 afl-fuzz-refactor: $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) \
-		src/core/globals.c src/core/queue.c src/core/executor.c src/core/forkserver.c \
-		src/utils/timing.c src/utils/random.c src/utils/system.c \
-		src/analysis/bitmap.c src/analysis/coverage.c \
-		src/io/file_ops.c src/io/stats.c \
-		src/mutation/mutation_helpers.c src/mutation/fuzzing_engine.c src/mutation/dictionary.c src/mutation/trimming.c src/mutation/postprocessor.c \
-		src/mutation/core/fuzz_context.c src/mutation/core/fuzz_engine.c \
-		src/mutation/engines/bitflip/bitflip_1_1.c src/mutation/engines/bitflip/bitflip_2_1.c src/mutation/engines/bitflip/bitflip_4_1.c \
-		src/mutation/engines/bitflip/bitflip_8_8.c src/mutation/engines/bitflip/bitflip_16_8.c src/mutation/engines/bitflip/bitflip_32_8.c \
-		src/mutation/engines/bitflip/bitflip_engine.c \
-		src/mutation/engines/arithmetic/arith_8.c src/mutation/engines/arithmetic/arith_16.c src/mutation/engines/arithmetic/arith_32.c \
-		src/mutation/engines/arithmetic/arithmetic_engine.c \
-		src/mutation/engines/interesting/interesting_engine.c \
-		src/mutation/engines/dictionary/dictionary_engine.c \
-		src/mutation/engines/havoc/havoc_engine.c \
-		src/mutation/engines/splice/splice_engine.c \
-		src/sync/sync.c src/main/main.c -o $@ $(LDFLAGS)
+	@set -e; \
+	SRCS="$$(find src -type f -name '*.c' ! -path '*/main/main.c' -print | sort)"; \
+	MAIN=src/main/main.c; \
+	$(CC) $(CFLAGS) $$SRCS $$MAIN -o $@ $(LDFLAGS)
+	@ echo "Building afl-fuzz-refactor"
 
 afl-showmap: afl-showmap.c $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
