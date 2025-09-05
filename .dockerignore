@@ -1,0 +1,36 @@
+.git
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts
+build/
+dist/
+out/
+coverage/
+.cache/
+
+# Environments
+venv/
+.venv/
+.env
+.env.*
+
+# Node (if any)
+node_modules/
+
+# Large, non-essential repo content
+test/
+tests/
