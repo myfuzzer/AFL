@@ -130,3 +130,5 @@ if (queued_paths != havoc_queued) {
 ### 致谢
 
 本项目包含并基于 Google 的 american fuzzy lop (AFL) 项目的源代码。感谢 Google 对开源社区与软件安全生态的长期贡献。
+
+`qemu_mode` 的补丁来自 `https://github.com/blurbdust/AFL`
